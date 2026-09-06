@@ -1,4 +1,5 @@
-import pool from "./connection";
+import { AuthLog } from "../entities/AuthLog";
+import { getRepo } from "./data-source";
 
 /** Best-effort: nunca debe romper el flujo de login/registro si falla. */
 export async function logAuthEvent(
@@ -7,12 +8,13 @@ export async function logAuthEvent(
   request: Request,
 ) {
   try {
-    const ip = request.headers.get("x-forwarded-for") ?? null;
-    const userAgent = request.headers.get("user-agent") ?? null;
-    await pool.query(
-      "INSERT INTO auth_logs (user_id, event_type, ip_address, user_agent) VALUES ($1, $2, $3, $4)",
-      [userId, eventType, ip, userAgent],
-    );
+    const repo = await getRepo(AuthLog);
+    await repo.insert({
+      user_id: userId,
+      event_type: eventType,
+      ip_address: request.headers.get("x-forwarded-for") ?? null,
+      user_agent: request.headers.get("user-agent") ?? null,
+    });
   } catch {
     // no-op: la auditoría no debe bloquear la autenticación
   }

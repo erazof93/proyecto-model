@@ -1,119 +1,180 @@
-// El pool real (default export de ./connection) es un objeto con un método
-// .query — se mockea así, no como una función `query` suelta en el módulo
-// (esa forma no coincide con lo que connection.ts realmente exporta).
-jest.mock("../connection", () => ({
-  __esModule: true,
-  default: { query: jest.fn() },
+/**
+ * @jest-environment node
+ *
+ * queries.ts se reescribió sobre TypeORM: en vez de mockear el pool `pg` y
+ * afirmar sobre strings SQL, mockeamos ../data-source y afirmamos sobre las
+ * llamadas al repositorio / QueryBuilder (fragmentos + parámetros nombrados,
+ * nunca interpolados).
+ */
+
+type QbCall = { method: string; args: unknown[] };
+
+const qbFactory = () => {
+  const calls: QbCall[] = [];
+  const qb: Record<string, unknown> = { __calls: calls };
+  const chain = [
+    "where",
+    "andWhere",
+    "orderBy",
+    "groupBy",
+    "skip",
+    "take",
+    "limit",
+    "select",
+    "addSelect",
+    "leftJoin",
+  ];
+  for (const m of chain) {
+    qb[m] = jest.fn((...args: unknown[]) => {
+      calls.push({ method: m, args });
+      return qb;
+    });
+  }
+  qb.getManyAndCount = jest.fn().mockResolvedValue([[], 0]);
+  qb.getOne = jest.fn().mockResolvedValue(null);
+  qb.getMany = jest.fn().mockResolvedValue([]);
+  qb.getRawMany = jest.fn().mockResolvedValue([]);
+  qb.getRawOne = jest.fn().mockResolvedValue({ max: "0" });
+  return qb;
+};
+
+const mockRepo = {
+  createQueryBuilder: jest.fn(),
+  find: jest.fn().mockResolvedValue([]),
+  findOne: jest.fn().mockResolvedValue(null),
+  existsBy: jest.fn().mockResolvedValue(false),
+  update: jest.fn().mockResolvedValue({}),
+  delete: jest.fn().mockResolvedValue({}),
+};
+
+jest.mock("../data-source", () => ({
+  getRepo: jest.fn(async () => mockRepo),
+  initializeDataSource: jest.fn(async () => ({
+    transaction: jest.fn(),
+  })),
 }));
 
-import pool from "../connection";
-import { getModelos, getModeloBySlug, getReviews } from "../queries";
+import { getModeloBySlug, getModelos, getReviews } from "../queries";
 
-const mockQuery = pool.query as jest.Mock;
+/** Última QB creada, para inspeccionar sus llamadas encadenadas. */
+let lastQb: ReturnType<typeof qbFactory>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockRepo.createQueryBuilder.mockImplementation(() => {
+    lastQb = qbFactory();
+    return lastQb;
+  });
+  mockRepo.find.mockResolvedValue([]);
+  mockRepo.findOne.mockResolvedValue(null);
+});
+
+/** Todos los fragmentos SQL (primer arg string) pasados a where/andWhere. */
+const whereFragments = () =>
+  (lastQb.__calls as QbCall[])
+    .filter((c) => c.method === "where" || c.method === "andWhere")
+    .map((c) => String(c.args[0]));
+
+/** Objeto de parámetros combinado de todas las llamadas where/andWhere. */
+const whereParams = () =>
+  Object.assign(
+    {},
+    ...(lastQb.__calls as QbCall[])
+      .filter((c) => c.method === "where" || c.method === "andWhere")
+      .map((c) => c.args[1] ?? {}),
+  );
 
 describe("getModelos", () => {
-  beforeEach(() => mockQuery.mockReset());
-
   it("only queries active, verified models by default", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] });
     await getModelos();
-
-    const [sql] = mockQuery.mock.calls[0];
-    expect(sql).toContain("status = 'ACTIVE'");
-    expect(sql).toContain("is_verified = true");
+    expect(whereFragments()).toEqual(
+      expect.arrayContaining(["m.status = :status", "m.is_verified = :verified"]),
+    );
+    expect(whereParams()).toMatchObject({ status: "ACTIVE", verified: true });
   });
 
-  it("adds a gender filter as a parameterized condition, never string-interpolated", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] });
+  it("adds a gender filter as a named parameter, never string-interpolated", async () => {
     await getModelos({ gender: "WOMAN" });
-
-    const [sql, params] = mockQuery.mock.calls[0];
-    expect(sql).toContain("gender = $1");
-    expect(sql).not.toContain("WOMAN");
-    expect(params).toContain("WOMAN");
+    const frags = whereFragments();
+    expect(frags).toContain("m.gender = :gender");
+    expect(frags.join(" ")).not.toContain("WOMAN");
+    expect(whereParams()).toMatchObject({ gender: "WOMAN" });
   });
 
   it("matches city against both the home city and the travel-cities array", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] });
     await getModelos({ city: "Callao" });
-
-    const [sql, params] = mockQuery.mock.calls[0];
-    expect(sql).toContain("city = $1");
-    expect(sql).toContain("$1 = ANY(cities_travel)");
-    expect(params).toEqual(expect.arrayContaining(["Callao"]));
+    const cityFrag = whereFragments().find((f) => f.includes(":city"));
+    expect(cityFrag).toContain("m.city = :city");
+    expect(cityFrag).toContain(":city = ANY(m.cities_travel)");
+    expect(whereParams()).toMatchObject({ city: "Callao" });
   });
 
-  it("strips the total_count window column out of the returned rows", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "1", name: "Sofía", total_count: "3" }],
-    });
-    const result = await getModelos();
-
-    expect(result.data[0]).not.toHaveProperty("total_count");
-    expect(result.total).toBe(3);
+  it("clamps pageSize to a maximum of 50", async () => {
+    await getModelos({ pageSize: 500 });
+    expect(lastQb.take).toHaveBeenCalledWith(50);
   });
 
-  it("computes totalPages from the total row count and page size", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "1", total_count: "17" }],
+  it("computes totalPages from the total count and page size", async () => {
+    mockRepo.createQueryBuilder.mockImplementationOnce(() => {
+      lastQb = qbFactory();
+      (lastQb.getManyAndCount as jest.Mock).mockResolvedValue([[], 17]);
+      return lastQb;
     });
     const result = await getModelos({ pageSize: 8 });
-
     expect(result.total).toBe(17);
     expect(result.totalPages).toBe(3); // ceil(17 / 8)
   });
 
   it("returns totalPages of 1 (not 0) when there are no results", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] });
     const result = await getModelos();
     expect(result.total).toBe(0);
     expect(result.totalPages).toBe(1);
   });
 
-  it("clamps pageSize to a maximum of 50", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] });
-    await getModelos({ pageSize: 500 });
-
-    const [, params] = mockQuery.mock.calls[0];
-    // LIMIT es el penúltimo parámetro (antes del OFFSET)
-    expect(params[params.length - 2]).toBe(50);
+  it("never leaks the total_count window column into the rows (TypeORM returns clean entities)", async () => {
+    mockRepo.createQueryBuilder.mockImplementationOnce(() => {
+      lastQb = qbFactory();
+      (lastQb.getManyAndCount as jest.Mock).mockResolvedValue([[{ id: "1", name: "Sofía" }], 1]);
+      return lastQb;
+    });
+    const result = await getModelos();
+    expect(result.data[0]).not.toHaveProperty("total_count");
   });
 });
 
 describe("getModeloBySlug", () => {
-  beforeEach(() => mockQuery.mockReset());
-
   it("queries by slug and excludes suspended models", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [{ id: "1", slug: "sofia-lima" }] });
+    mockRepo.createQueryBuilder.mockImplementationOnce(() => {
+      lastQb = qbFactory();
+      (lastQb.getOne as jest.Mock).mockResolvedValue({ id: "1", slug: "sofia-lima" });
+      return lastQb;
+    });
     const result = await getModeloBySlug("sofia-lima");
 
-    const [sql, params] = mockQuery.mock.calls[0];
-    expect(sql).toContain("slug = $1");
-    expect(sql).toContain("status <> 'SUSPENDED'");
-    expect(params).toEqual(["sofia-lima"]);
+    const frags = whereFragments();
+    expect(frags).toContain("m.slug = :slug");
+    expect(frags).toContain("m.status <> :suspended");
+    expect(whereParams()).toMatchObject({ slug: "sofia-lima", suspended: "SUSPENDED" });
     expect(result?.slug).toBe("sofia-lima");
   });
 
   it("returns null when no model matches", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [] });
     const result = await getModeloBySlug("no-existe");
     expect(result).toBeNull();
   });
 });
 
 describe("getReviews", () => {
-  beforeEach(() => mockQuery.mockReset());
-
   it("queries reviews for the given model ordered by most recent", async () => {
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ id: "r1", model_id: "m1", rating: 5, created_at: "2026-01-01" }],
-    });
+    mockRepo.find.mockResolvedValueOnce([
+      { id: "r1", model_id: "m1", rating: 5, created_at: "2026-01-01" },
+    ]);
     const result = await getReviews("m1");
 
-    const [sql, params] = mockQuery.mock.calls[0];
-    expect(sql).toContain("WHERE model_id = $1");
-    expect(sql).toContain("ORDER BY created_at DESC");
-    expect(params).toEqual(["m1"]);
+    expect(mockRepo.find).toHaveBeenCalledWith({
+      where: { model_id: "m1" },
+      order: { created_at: "DESC" },
+    });
     expect(result).toHaveLength(1);
   });
 });

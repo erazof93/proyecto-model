@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db/connection";
 import { getSession } from "@/lib/auth/session";
+import { addModelPhoto } from "@/lib/db/photos";
+import { getModelPhotos } from "@/lib/db/queries";
 
 export async function GET() {
   const session = await getSession();
@@ -8,11 +9,8 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const result = await pool.query(
-    "SELECT * FROM model_photos WHERE model_id = $1 ORDER BY order_index ASC",
-    [session.modelId],
-  );
-  return NextResponse.json({ photos: result.rows });
+  const photos = await getModelPhotos(session.modelId);
+  return NextResponse.json({ photos });
 }
 
 export async function POST(request: Request) {
@@ -32,12 +30,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await pool.query(
-    `INSERT INTO model_photos (model_id, cloudinary_id, cloudinary_url, is_verified, is_primary, order_index)
-     VALUES ($1, $2, $3, false, false, (SELECT COALESCE(MAX(order_index), 0) + 1 FROM model_photos WHERE model_id = $1))
-     RETURNING *`,
-    [session.modelId, cloudinaryId, cloudinaryUrl],
-  );
-
-  return NextResponse.json({ photo: result.rows[0] }, { status: 201 });
+  const photo = await addModelPhoto(session.modelId, cloudinaryId, cloudinaryUrl);
+  return NextResponse.json({ photo }, { status: 201 });
 }
