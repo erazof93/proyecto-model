@@ -1,0 +1,11 @@
+{
+  "name": "@proyecto-model/types",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tipos TypeScript compartidos del monorepo",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  }
+}

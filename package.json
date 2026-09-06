@@ -1,0 +1,30 @@
+{
+  "name": "proyecto-model",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Marketplace de modelos - Monorepo (pnpm workspaces)",
+  "license": "MIT",
+  "scripts": {
+    "dev:client": "pnpm --filter @proyecto-model/client dev",
+    "dev:admin": "pnpm --filter @proyecto-model/admin dev -- -p 3001",
+    "dev:all": "pnpm --parallel --filter @proyecto-model/client --filter @proyecto-model/admin dev",
+    "build": "pnpm --recursive run build",
+    "test": "pnpm --recursive run test",
+    "lint": "pnpm --recursive run lint",
+    "format": "pnpm --recursive run format",
+    "clean": "pnpm --recursive --parallel exec rimraf node_modules .next dist && rimraf node_modules",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:debug": "playwright test --debug",
+    "e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "typescript": "^5.3.0",
+    "@playwright/test": "^1.42.1"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=8"
+  }
+}

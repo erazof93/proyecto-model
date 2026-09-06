@@ -1,0 +1,11 @@
+{
+  "name": "@proyecto-model/config",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Configuración compartida (eslint, tsconfig base, constantes)",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  }
+}

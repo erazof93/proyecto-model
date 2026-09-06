@@ -1,0 +1,12 @@
+{
+  "name": "@proyecto-model/styles",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Estilos y tokens de diseño compartidos",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./tokens": "./tokens.ts"
+  }
+}
