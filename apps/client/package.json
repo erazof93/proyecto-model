@@ -1,0 +1,47 @@
+{
+  "name": "@proyecto-model/client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cliente web - Marketplace de modelos",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest --passWithNoTests",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "next": "15.0.0",
+    "zustand": "4.4.0",
+    "next-cloudinary": "5.0.0",
+    "zod": "3.22.0",
+    "react-hook-form": "7.47.0",
+    "clsx": "2.0.0",
+    "tailwind-merge": "2.2.0",
+    "lucide-react": "0.294.0",
+    "pg": "8.11.3",
+    "jose": "5.2.0",
+    "bcryptjs": "2.4.3",
+    "@proyecto-model/types": "workspace:*",
+    "@proyecto-model/utils": "workspace:*",
+    "@proyecto-model/config": "workspace:*",
+    "@proyecto-model/styles": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.10.0",
+    "@types/pg": "8.10.9",
+    "@types/bcryptjs": "2.4.6",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^8.50.0",
+    "eslint-config-next": "15.0.0",
+    "prettier": "^3.0.0"
+  }
+}
