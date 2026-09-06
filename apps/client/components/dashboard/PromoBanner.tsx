@@ -1,12 +1,15 @@
-import { Star } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Star, MessageCircle } from "lucide-react";
+import { ADMIN_TELEGRAM_USERNAME } from "@proyecto-model/config";
 
 const plans = [
   { name: "TOP Lista", price: "S/ 50 x 7 días" },
   { name: "BANNER Carousel", price: "S/ 75 x 7 días" },
 ];
 
-export function PromoBanner() {
+export function PromoBanner({ modelName }: { modelName: string }) {
+  const message = `Hola, soy ${modelName}. Quiero consultar sobre destacados y opciones de la plataforma.`;
+  const telegramLink = `https://t.me/${ADMIN_TELEGRAM_USERNAME}?text=${encodeURIComponent(message)}`;
+
   return (
     <div className="rounded-md bg-gradient-to-br from-primary to-accent p-8 text-center text-white">
       <Star className="mx-auto mb-2 h-8 w-8 fill-amber-300 text-amber-300" />
@@ -23,9 +26,14 @@ export function PromoBanner() {
           </button>
         ))}
       </div>
-      <Button variant="secondary" fullWidth className="mt-4 bg-white text-primary hover:bg-white/90">
-        Contactar admin vía Telegram
-      </Button>
+      <a
+        href={telegramLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-white px-7 py-3 text-sm font-semibold text-primary transition hover:bg-white/90"
+      >
+        <MessageCircle className="h-4 w-4" /> Contactar admin vía Telegram
+      </a>
     </div>
   );
 }

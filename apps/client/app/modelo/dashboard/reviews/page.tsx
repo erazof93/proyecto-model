@@ -1,26 +1,36 @@
-import { Star } from "lucide-react";
-import { Card } from "@/components/ui/Card";
-import { mockReviews } from "@/lib/mock-data";
+import { notFound } from "next/navigation";
+import { ReviewsStats } from "@/components/dashboard/ReviewsStats";
+import { ReviewCard } from "@/components/dashboard/ReviewCard";
+import { getSession } from "@/lib/auth/session";
+import { getModelReviews, getModelReviewStats } from "@/lib/db/queries";
 
-export default function ReviewsPage() {
+export default async function ReviewsPage() {
+  const session = await getSession();
+  if (!session?.modelId) notFound();
+
+  const [reviews, stats] = await Promise.all([
+    getModelReviews(session.modelId),
+    getModelReviewStats(session.modelId),
+  ]);
+
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-bold text-dark">Reseñas</h1>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {mockReviews.map((review) => (
-          <Card key={review.id} className="p-4">
-            <div className="mb-1 flex items-center justify-between">
-              <p className="font-medium text-dark">Cliente verificado</p>
-              <div className="flex gap-0.5 text-amber-400">
-                {Array.from({ length: review.rating }).map((_, i) => (
-                  <Star key={i} className="h-4 w-4 fill-current" />
-                ))}
-              </div>
-            </div>
-            <p className="text-sm text-dark/70">{review.comment}</p>
-          </Card>
-        ))}
-      </div>
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold text-dark">Mis reseñas</h1>
+
+      <ReviewsStats {...stats} />
+
+      {reviews.length > 0 && (
+        <div>
+          <h2 className="mb-4 text-lg font-bold text-dark">
+            {reviews.length} reseña{reviews.length !== 1 ? "s" : ""}
+          </h2>
+          <div className="space-y-3">
+            {reviews.map((review) => (
+              <ReviewCard key={review.id} review={review} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

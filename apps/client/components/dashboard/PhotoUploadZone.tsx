@@ -55,12 +55,12 @@ export function PhotoUploadZone({
         onError={(err) => setError(typeof err === "string" ? err : "Error al subir la foto")}
       >
         {({ open }) => (
-          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-border bg-white p-10 text-center text-dark/50 hover:border-primary hover:text-primary">
+          <div className="flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-border bg-white p-10 text-center text-dark/50">
             <UploadCloud className="h-8 w-8" />
             <Button type="button" onClick={() => open()} loading={uploading}>
               Subir foto
             </Button>
-          </label>
+          </div>
         )}
       </CldUploadWidget>
     </div>

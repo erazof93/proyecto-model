@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 
 export function ModelCard({ model }: { model: Model }) {
   return (
-    <Card className="flex flex-col overflow-hidden">
+    <Card className="flex flex-col overflow-hidden" data-testid={`model-card-${model.slug}`}>
       <div className="relative flex h-56 items-end bg-gradient-to-br from-dark/40 to-primary p-3">
         <span className="text-xs font-medium text-white/80">Foto principal</span>
       </div>
