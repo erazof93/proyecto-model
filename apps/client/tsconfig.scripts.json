@@ -1,0 +1,18 @@
+{
+  "//": "Config para ejecutar scripts sueltos (.ts) con ts-node: seed, test-connection, CLI de TypeORM. El tsconfig.json principal apunta al bundler de Next (module/moduleResolution ESM) y ts-node necesita CommonJS.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noEmit": false,
+    "incremental": false,
+    "plugins": []
+  },
+  "ts-node": {
+    "transpileOnly": true,
+    "files": true
+  },
+  "include": ["lib/**/*.ts"],
+  "//exclude": "Propio, para NO heredar 'lib/db/migrations' del exclude del tsconfig.json base: el CLI de TypeORM sí necesita compilar las migraciones.",
+  "exclude": ["node_modules"]
+}

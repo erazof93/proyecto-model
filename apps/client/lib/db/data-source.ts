@@ -1,16 +1,20 @@
 import "reflect-metadata";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { DataSource } from "typeorm";
-import {
-  AuthLog,
-  Checklist,
-  FeaturedListing,
-  Model,
-  ModelChecklist,
-  ModelPhoto,
-  Review,
-  Transaction,
-  User,
-} from "../entities";
+// Imports por-fichero (no el barrel "../entities"): el CLI de TypeORM corre
+// este módulo con ts-node y el resolver de Node no soporta "directory imports"
+// (../entities -> ../entities/index). El barrel sigue disponible para el código
+// de la app en lib/entities/index.ts.
+import { AuthLog } from "../entities/AuthLog";
+import { Checklist } from "../entities/Checklist";
+import { FeaturedListing } from "../entities/FeaturedListing";
+import { Model } from "../entities/Model";
+import { ModelChecklist } from "../entities/ModelChecklist";
+import { ModelPhoto } from "../entities/ModelPhoto";
+import { Review } from "../entities/Review";
+import { Transaction } from "../entities/Transaction";
+import { User } from "../entities/User";
 
 // El esquema real vive en apps/supabase/migrations/*.sql y las entities lo
 // espejan 1:1, así que `synchronize` SIEMPRE va en false: TypeORM nunca debe
@@ -20,6 +24,21 @@ import {
 // sólo guarda config; la conexión ocurre en `initializeDataSource()`, que es
 // perezosa e idempotente. Si falta config de BD, se lanza un error claro ahí
 // (no un `ECONNREFUSED 127.0.0.1:5432` opaco por el fallback de pg).
+
+// El CLI de TypeORM / ts-node NO cargan apps/client/.env.local (Next.js sí).
+// Cárgalo aquí, sólo si aún no hay config de BD en el entorno, para que
+// `pnpm typeorm ...` funcione sin wiring extra. En Next/Vercel el guard salta.
+if (!process.env.DATABASE_URL && !process.env.DB_HOST) {
+  try {
+    // cwd = apps/client tanto en el CLI (pnpm --filter) como en next/jest.
+    const envFile = resolve(process.cwd(), ".env.local");
+    if (existsSync(envFile) && typeof process.loadEnvFile === "function") {
+      process.loadEnvFile(envFile);
+    }
+  } catch {
+    // ignora: si no se puede leer el fichero, seguimos con el entorno actual
+  }
+}
 
 type ConnConfig = {
   url?: string;
@@ -68,38 +87,49 @@ function resolveConn(): ConnConfig | null {
 
 const conn = resolveConn();
 
-export const AppDataSource = new DataSource({
-  type: "postgres",
-  // Si `conn` es null dejamos la config mínima: `new DataSource` no conecta y
-  // `initializeDataSource()` abortará con un mensaje accionable antes de intentarlo.
-  ...(conn ?? {}),
-  synchronize: false,
-  logging: process.env.NODE_ENV === "development",
-  entities: [
-    User,
-    Model,
-    ModelPhoto,
-    Review,
-    FeaturedListing,
-    Checklist,
-    ModelChecklist,
-    Transaction,
-    AuthLog,
-  ],
-  migrations: [__dirname + "/migrations/*.{ts,js}"],
-  subscribers: [],
-  // Vercel serverless: muchas lambdas concurrentes × pool grande agota el
-  // límite de conexiones de Supabase. Cap bajo por instancia; usa la cadena
-  // del *pooler* de Supabase (puerto 6543) en producción.
-  extra: { max: Number(process.env.DB_POOL_MAX ?? 3) },
-});
+const ENTITIES = [
+  User,
+  Model,
+  ModelPhoto,
+  Review,
+  FeaturedListing,
+  Checklist,
+  ModelChecklist,
+  Transaction,
+  AuthLog,
+];
 
-// Serverless / hot-reload: reutiliza la misma instancia y la MISMA promesa de
-// inicialización entre invocaciones e imports concurrentes, para no abrir
-// pools duplicados ni caer en la carrera de `if (!isInitialized) initialize()`.
-type Cache = { promise?: Promise<DataSource> };
-const globalForDs = globalThis as unknown as { _typeormDs?: Cache };
-const cache: Cache = (globalForDs._typeormDs ??= {});
+function buildDataSource(): DataSource {
+  return new DataSource({
+    type: "postgres",
+    // Si `conn` es null dejamos la config mínima: `new DataSource` no conecta y
+    // `initializeDataSource()` abortará con un mensaje accionable antes de intentarlo.
+    ...(conn ?? {}),
+    synchronize: false,
+    logging: process.env.NODE_ENV === "development",
+    entities: ENTITIES,
+    // SIN `migrations` aquí a propósito: al hacer `initialize()`, TypeORM importa
+    // los ficheros que casen con ese glob, y en el runtime de Next eso revienta
+    // ("typeorm does not provide an export named 'MigrationInterface'"). Las
+    // migraciones son CLI-only -> viven en migrations.datasource.ts.
+    subscribers: [],
+    // Vercel serverless: muchas lambdas concurrentes × pool grande agota el
+    // límite de conexiones de Supabase. Cap bajo por instancia; usa la cadena
+    // del *pooler* de Supabase (puerto 6543) en producción.
+    extra: { max: Number(process.env.DB_POOL_MAX ?? 3) },
+  });
+}
+
+// En `next dev` (y en cada lambda) cada route handler / RSC es su PROPIO grafo
+// de módulos: sin este cache en globalThis habría un `DataSource` (y un set de
+// clases de entity) distinto por ruta, y la ruta que no inicializó primero
+// fallaría con "No metadata for X was found". Cacheamos la instancia Y la
+// promesa de init en globalThis para que TODAS las rutas compartan una sola.
+type DsCache = { ds?: DataSource; promise?: Promise<DataSource> };
+const globalForDs = globalThis as unknown as { __appDataSource?: DsCache };
+const cache: DsCache = (globalForDs.__appDataSource ??= {});
+
+export const AppDataSource: DataSource = (cache.ds ??= buildDataSource());
 
 export function initializeDataSource(): Promise<DataSource> {
   if (AppDataSource.isInitialized) return Promise.resolve(AppDataSource);
@@ -123,10 +153,27 @@ export function initializeDataSource(): Promise<DataSource> {
   return cache.promise;
 }
 
+/**
+ * Nombre estable de una entity para `getRepository()` / joins.
+ *
+ * Distintos bundles de Next tienen REFERENCIAS DE CLASE distintas para la misma
+ * entity, así que pasar la clase directamente rompe el lookup de metadata en el
+ * DataSource compartido. El nombre de clase ("Model", "User", …) sí es estable
+ * (Next conserva class names en el server) y TypeORM lo resuelve igual.
+ */
+export function entityName(entity: import("typeorm").EntityTarget<unknown>): string {
+  if (typeof entity === "function") return entity.name;
+  if (typeof entity === "string") return entity;
+  // EntitySchema u objeto { name }
+  return (entity as { options?: { name?: string }; name?: string }).options?.name
+    ?? (entity as { name?: string }).name
+    ?? String(entity);
+}
+
 /** Azúcar: `await getRepo(User)` en vez de repetir initialize + getRepository. */
 export async function getRepo<T extends import("typeorm").ObjectLiteral>(
   entity: import("typeorm").EntityTarget<T>,
 ) {
   const ds = await initializeDataSource();
-  return ds.getRepository(entity);
+  return ds.getRepository<T>(entityName(entity));
 }

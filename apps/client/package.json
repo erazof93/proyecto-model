@@ -12,12 +12,12 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "format": "prettier --write .",
-    "typeorm": "typeorm-ts-node-commonjs -d lib/db/data-source.ts",
+    "typeorm": "ts-node --project tsconfig.scripts.json node_modules/typeorm/cli.js -d lib/db/migrations.datasource.ts",
     "migration:generate": "pnpm typeorm migration:generate",
     "migration:run": "pnpm typeorm migration:run",
     "migration:revert": "pnpm typeorm migration:revert",
     "migration:show": "pnpm typeorm migration:show",
-    "seed": "ts-node --project tsconfig.json lib/db/seed.ts"
+    "seed": "ts-node --project tsconfig.scripts.json lib/db/seed.ts"
   },
   "dependencies": {
     "@proyecto-model/config": "workspace:*",

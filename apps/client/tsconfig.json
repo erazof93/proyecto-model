@@ -29,5 +29,5 @@
     ".next/types/**/*.ts",
     "app/**/*"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "lib/db/migrations"]
 }

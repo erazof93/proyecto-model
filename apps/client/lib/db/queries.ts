@@ -12,7 +12,7 @@ import { ModelChecklist as ModelChecklistEntity } from "../entities/ModelCheckli
 import { ModelPhoto as ModelPhotoEntity } from "../entities/ModelPhoto";
 import { Review as ReviewEntity } from "../entities/Review";
 import { User as UserEntity } from "../entities/User";
-import { getRepo, initializeDataSource } from "./data-source";
+import { entityName, getRepo, initializeDataSource } from "./data-source";
 
 export type ModelFilters = {
   gender?: string;
@@ -173,7 +173,7 @@ export async function getModelReviews(modelId: string): Promise<ReviewWithCustom
   const repo = await getRepo(ReviewEntity);
   const rows = await repo
     .createQueryBuilder("r")
-    .leftJoin(UserEntity, "u", "u.id = r.customer_id")
+    .leftJoin(entityName(UserEntity), "u", "u.id = r.customer_id")
     .select("r.id", "id")
     .addSelect("r.model_id", "model_id")
     .addSelect("r.customer_id", "customer_id")
@@ -261,7 +261,7 @@ export async function updateModelServices(
     // IN (:...ids) revienta con array vacío -> centinela imposible = 0 filas.
     const ids = checklistIds.length > 0 ? checklistIds : ["00000000-0000-0000-0000-000000000000"];
     const valid = await manager
-      .getRepository(ChecklistEntity)
+      .getRepository<{ id: string; name: string }>(entityName(ChecklistEntity))
       .createQueryBuilder("c")
       .where("c.id IN (:...ids)", { ids })
       .andWhere("c.is_active = :active", { active: true })
@@ -270,16 +270,17 @@ export async function updateModelServices(
     const validIds = valid.map((c) => c.id);
     const serviceNames = valid.map((c) => c.name);
 
-    await manager.getRepository(ModelChecklistEntity).delete({ model_id: modelId });
+    const mcRepo = manager.getRepository(entityName(ModelChecklistEntity));
+    await mcRepo.delete({ model_id: modelId });
 
     if (validIds.length > 0) {
-      await manager
-        .getRepository(ModelChecklistEntity)
-        .insert(validIds.map((checklist_id) => ({ model_id: modelId, checklist_id })));
+      await mcRepo.insert(
+        validIds.map((checklist_id) => ({ model_id: modelId, checklist_id })),
+      );
     }
 
     await manager
-      .getRepository(ModelEntity)
+      .getRepository(entityName(ModelEntity))
       .update({ id: modelId }, { services: serviceNames } as Partial<ModelEntity>);
 
     return { services: serviceNames, assignedIds: validIds };
