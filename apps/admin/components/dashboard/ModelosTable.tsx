@@ -5,10 +5,13 @@ import Link from "next/link";
 import type { Model } from "@proyecto-model/types";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { CreateFeaturedDialog } from "@/components/admin/CreateFeaturedDialog";
 
 export function ModelosTable({ initialModelos }: { initialModelos: Model[] }) {
   const [modelos, setModelos] = useState(initialModelos);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Modelo para el que está abierto el diálogo "Destacar" (null = cerrado).
+  const [featuredFor, setFeaturedFor] = useState<Model | null>(null);
 
   // Si el padre (Server Component) vuelve a renderizar con props nuevas
   // (p.ej. tras cambiar el filtro), re-sincroniza: useState solo toma
@@ -78,12 +81,26 @@ export function ModelosTable({ initialModelos }: { initialModelos: Model[] }) {
                   >
                     {modelo.is_verified ? "Quitar verificación" : "Verificar"}
                   </Button>
+                  <Button
+                    className="px-3 py-1.5 text-xs"
+                    onClick={() => setFeaturedFor(modelo)}
+                  >
+                    Destacar
+                  </Button>
                 </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      <CreateFeaturedDialog
+        open={featuredFor !== null}
+        defaultModelId={featuredFor?.id}
+        models={modelos.map((m) => ({ id: m.id, name: m.name, username: m.username }))}
+        onClose={() => setFeaturedFor(null)}
+        onCreated={() => setFeaturedFor(null)}
+      />
     </div>
   );
 }

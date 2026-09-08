@@ -87,21 +87,37 @@ export async function getModeloBySlug(slug: string): Promise<Model | null> {
  * Modelos destacadas: se controlan 100% desde `featured_listings` (alta/orden
  * gestionados por el admin). Solo cuentan las filas ACTIVE y sin expirar cuya
  * modelo esté a su vez ACTIVE. Orden: fijadas primero, luego `order_index`.
+ *
+ * `type` separa las dos ubicaciones de pago:
+ *   - "BANNER" → carrusel de la home
+ *   - "TOP"    → grid "Modelos Top" al principio de /modelos
+ * Sin `type` devuelve ambas (compat).
  */
-export async function getFeaturedModelos(): Promise<Model[]> {
+export async function getFeaturedModelos(filters?: {
+  type?: "TOP" | "BANNER";
+}): Promise<Model[]> {
   const repo = await getRepo(FeaturedListingEntity);
-  const rows = await repo
+  const qb = repo
     .createQueryBuilder("fl")
     .innerJoinAndSelect("fl.model", "m")
     .where("fl.status = :status", { status: "ACTIVE" })
     .andWhere("fl.end_date > NOW()")
-    .andWhere("m.status = :mstatus", { mstatus: "ACTIVE" })
+    .andWhere("m.status = :mstatus", { mstatus: "ACTIVE" });
+
+  if (filters?.type) {
+    qb.andWhere("fl.type = :type", { type: filters.type });
+  }
+
+  const rows = await qb
     .orderBy("fl.is_pinned", "DESC")
     .addOrderBy("fl.order_index", "ASC")
     .addOrderBy("fl.created_at", "DESC")
-    .take(20)
     .getMany();
-  return rows.map((r) => r.model) as unknown as Model[];
+  // `getMany()` devuelve instancias de la clase entity Model. La home pasa este
+  // array a <FeaturedCarousel>, que es un Client Component, y React no serializa
+  // objetos con prototipo de clase de Server -> Client. El round-trip JSON los
+  // aplana a objetos planos (y descarta las relaciones no cargadas).
+  return rows.map((r) => JSON.parse(JSON.stringify(r.model)) as Model);
 }
 
 /**

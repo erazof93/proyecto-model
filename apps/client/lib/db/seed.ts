@@ -11,6 +11,7 @@
  */
 import { hashPassword } from "../auth/password";
 import { Checklist } from "../entities/Checklist";
+import { FeaturedListing } from "../entities/FeaturedListing";
 import { Model } from "../entities/Model";
 import { ModelChecklist } from "../entities/ModelChecklist";
 import { Review } from "../entities/Review";
@@ -64,6 +65,7 @@ export async function seedDatabase() {
   const checklists = ds.getRepository(Checklist);
   const modelChecklists = ds.getRepository(ModelChecklist);
   const reviews = ds.getRepository(Review);
+  const featured = ds.getRepository(FeaturedListing);
 
   // --- Admin (idempotente por username) ---
   if (!(await users.existsBy({ username: "admin" }))) {
@@ -166,10 +168,47 @@ export async function seedDatabase() {
     ]);
   }
 
+  // --- Destacadas de ejemplo (idempotente por model_id + type) ---
+  // `featured_listings` es la única fuente de verdad de las destacadas. Dos
+  // ubicaciones de pago independientes:
+  //   - "TOP"    → grid "Modelos Top" al principio de /modelos
+  //   - "BANNER" → carrusel de la home
+  // Alta de ejemplo tipo "cortesía de admin": price 0, 30 días de vigencia.
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  let createdFeatured = 0;
+
+  async function ensureFeatured(model: Model, type: "TOP" | "BANNER", orderIndex: number) {
+    if (await featured.existsBy({ model_id: model.id, type })) return;
+    await featured.save(
+      featured.create({
+        model_id: model.id,
+        type,
+        price: "0",
+        duration_days: 30,
+        end_date: new Date(Date.now() + 30 * DAY_MS),
+        status: "ACTIVE",
+        is_pinned: false,
+        order_index: orderIndex,
+      }),
+    );
+    createdFeatured++;
+  }
+
+  // TOP: las 5 primeras (Sofía, Valentina, Camila, Alejandra, Daniela).
+  for (let i = 0; i < 5; i++) {
+    const model = modelsByName.get(MODEL_NAMES[i]);
+    if (model) await ensureFeatured(model, "TOP", i);
+  }
+  // BANNER: las 3 siguientes (Isabella, María, Carolina).
+  for (let i = 5; i < 8; i++) {
+    const model = modelsByName.get(MODEL_NAMES[i]);
+    if (model) await ensureFeatured(model, "BANNER", i - 5);
+  }
+
   const totalModels = await models.count();
   console.log(
     `✅ Seed OK: 1 admin, +${createdModels} modelos nuevas (${totalModels} en total), ` +
-      `${checklistRows.length} checklists.`,
+      `${checklistRows.length} checklists, +${createdFeatured} destacadas.`,
   );
 }
 

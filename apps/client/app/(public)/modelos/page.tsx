@@ -2,14 +2,20 @@ import { FilterSidebar } from "@/components/modelos/FilterSidebar";
 import { ModelGrid } from "@/components/modelos/ModelGrid";
 import { Pagination } from "@/components/modelos/Pagination";
 import { Logo } from "@/components/ui/Logo";
-import { getFilterOptions, getModelos } from "@/lib/db/queries";
+import { getFeaturedModelos, getFilterOptions, getModelos } from "@/lib/db/queries";
 
 type SearchParams = Promise<{ [key: string]: string | undefined }>;
 
 export default async function ModelosPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const page = Number(params.page) || 1;
-  const [result, filterOptions] = await Promise.all([
+
+  // El grid "Modelos Top" es una ubicación promocionada, no un resultado de
+  // búsqueda: solo tiene sentido en la primera página y sin filtros aplicados.
+  const hasFilters = Boolean(params.gender || params.city || params.service || params.q);
+  const showTop = page <= 1 && !hasFilters;
+
+  const [result, filterOptions, topFeatured] = await Promise.all([
     getModelos({
       gender: params.gender,
       city: params.city,
@@ -25,6 +31,12 @@ export default async function ModelosPage({ searchParams }: { searchParams: Sear
       console.error("[modelos] getFilterOptions falló:", err);
       return { cities: [], genders: [], services: [] };
     }),
+    showTop
+      ? getFeaturedModelos({ type: "TOP" }).catch((err) => {
+          console.error("[modelos] getFeaturedModelos(TOP) falló:", err);
+          return [];
+        })
+      : Promise.resolve([]),
   ]);
 
   return (
@@ -41,6 +53,12 @@ export default async function ModelosPage({ searchParams }: { searchParams: Sear
           options={filterOptions}
         />
         <div className="flex-1 px-6 py-6">
+          {topFeatured.length > 0 && (
+            <section className="mb-10">
+              <h2 className="mb-4 text-lg font-bold text-dark">Modelos Top</h2>
+              <ModelGrid models={topFeatured} />
+            </section>
+          )}
           <ModelGrid models={result.data} />
           <Pagination page={result.page} totalPages={result.totalPages} searchParams={params} />
         </div>

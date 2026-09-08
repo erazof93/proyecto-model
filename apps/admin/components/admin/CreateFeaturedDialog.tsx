@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { cn } from "@/lib/cn";
@@ -10,9 +10,11 @@ type Modelo = { id: string; name: string; username: string };
 // Mismos planes que se muestran en el dashboard de la modelo (PromoBanner):
 // precio fijo total por 7 días, no una tarifa por día. Mantener un único
 // origen de verdad para el pricing en vez de inventar un esquema "por día".
+// "BANNER" sale en el carrusel de la home; "TOP" en el grid "Modelos Top" de
+// /modelos. El `type` debe coincidir con el enum featured_type_enum de la BD.
 const PLANS = [
-  { type: "TOP" as const, label: "TOP Lista", price: 50, durationDays: 7 },
-  { type: "BANNER" as const, label: "BANNER Carousel", price: 75, durationDays: 7 },
+  { type: "BANNER" as const, label: "BANNER Carrusel (home)", price: 75, durationDays: 7 },
+  { type: "TOP" as const, label: "TOP Lista (/modelos)", price: 50, durationDays: 7 },
 ];
 
 export function CreateFeaturedDialog({
@@ -20,16 +22,29 @@ export function CreateFeaturedDialog({
   onClose,
   models,
   onCreated,
+  defaultModelId,
 }: {
   open: boolean;
   onClose: () => void;
   models: Modelo[];
   onCreated: () => void;
+  /** Preselecciona (y bloquea) el modelo — usado al abrir el diálogo desde una fila de la tabla. */
+  defaultModelId?: string;
 }) {
   const [modelId, setModelId] = useState("");
   const [planIndex, setPlanIndex] = useState(0);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // El componente no se desmonta al cerrar (return null tras los hooks), así
+  // que reseteamos el formulario cada vez que se abre.
+  useEffect(() => {
+    if (open) {
+      setModelId(defaultModelId ?? "");
+      setPlanIndex(0);
+      setError("");
+    }
+  }, [open, defaultModelId]);
 
   if (!open) return null;
   const plan = PLANS[planIndex];
@@ -88,7 +103,7 @@ export function CreateFeaturedDialog({
             <Select
               value={modelId}
               onChange={(e) => setModelId(e.target.value)}
-              disabled={submitting}
+              disabled={submitting || Boolean(defaultModelId)}
               className="w-full"
             >
               <option value="">Selecciona un modelo...</option>

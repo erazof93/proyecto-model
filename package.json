@@ -5,9 +5,10 @@
   "description": "Marketplace de modelos - Monorepo (pnpm workspaces)",
   "license": "MIT",
   "scripts": {
+    "dev": "pnpm --parallel --filter @proyecto-model/client --filter @proyecto-model/admin dev",
     "dev:client": "pnpm --filter @proyecto-model/client dev",
-    "dev:admin": "pnpm --filter @proyecto-model/admin dev -- -p 3001",
-    "dev:all": "pnpm --parallel --filter @proyecto-model/client --filter @proyecto-model/admin dev",
+    "dev:admin": "pnpm --filter @proyecto-model/admin dev",
+    "dev:all": "pnpm dev",
     "build": "pnpm --recursive run build",
     "test": "pnpm --recursive run test",
     "lint": "pnpm --recursive run lint",

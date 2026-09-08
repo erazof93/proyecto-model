@@ -214,6 +214,24 @@ describe("getFeaturedModelos", () => {
       .map((c) => c.args);
     expect(orderCalls[0]).toEqual(["fl.is_pinned", "DESC"]);
   });
+
+  it("no filtra por type cuando no se pasa", async () => {
+    await getFeaturedModelos();
+    expect(whereFragments()).not.toContain("fl.type = :type");
+  });
+
+  it("no aplica ningún cap (.take/.limit): las destacadas son curadas por el admin", async () => {
+    await getFeaturedModelos({ type: "TOP" });
+    expect(lastQb.take).not.toHaveBeenCalled();
+    expect(lastQb.limit).not.toHaveBeenCalled();
+  });
+
+  it("filtra por type como parámetro nombrado cuando se pasa BANNER", async () => {
+    await getFeaturedModelos({ type: "BANNER" });
+    expect(whereFragments()).toContain("fl.type = :type");
+    expect(whereFragments().join(" ")).not.toContain("BANNER");
+    expect(whereParams()).toMatchObject({ type: "BANNER" });
+  });
 });
 
 describe("getFilterOptions", () => {

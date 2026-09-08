@@ -21,7 +21,9 @@ export async function getAllModelos(filters?: AdminModelFilters): Promise<Model[
 
   if (filters?.search) {
     params.push(`%${filters.search}%`);
-    conditions.push(`(name ILIKE $${params.length} OR username ILIKE $${params.length})`);
+    conditions.push(
+      `(name ILIKE $${params.length} OR username ILIKE $${params.length} OR city ILIKE $${params.length})`,
+    );
   }
 
   if (filters?.isVerified !== undefined) {
@@ -38,7 +40,10 @@ export async function getAllModelos(filters?: AdminModelFilters): Promise<Model[
     query += " WHERE " + conditions.join(" AND ");
   }
 
-  query += " ORDER BY created_at DESC LIMIT 100";
+  // Guardarraíl generoso: la tabla del admin muestra "todas" las modelos y se
+  // acota con el buscador, no con paginación. 500 es efectivamente sin límite
+  // para este marketplace y evita una query patológica si la tabla crece.
+  query += " ORDER BY created_at DESC LIMIT 500";
 
   const result = await pool.query<Model>(query, params);
   return result.rows;
@@ -207,25 +212,41 @@ export type AdminStats = {
   avgRating: string;
 };
 
-export async function getAdminStats(): Promise<AdminStats> {
-  const [modelCount, verifiedCount, featuredCount, reviewStats] = await Promise.all([
-    pool.query<{ count: string }>("SELECT COUNT(*) FROM models WHERE status <> 'SUSPENDED'"),
-    pool.query<{ count: string }>("SELECT COUNT(*) FROM models WHERE is_verified = true"),
-    pool.query<{ count: string }>(
-      "SELECT COUNT(*) FROM featured_listings WHERE status = 'ACTIVE'",
-    ),
-    pool.query<{ count: string; avg: string | null }>(
-      "SELECT COUNT(*) AS count, AVG(rating) AS avg FROM reviews",
-    ),
-  ]);
+const EMPTY_ADMIN_STATS: AdminStats = {
+  totalModelos: 0,
+  verifiedModelos: 0,
+  activeFeatured: 0,
+  totalReviews: 0,
+  avgRating: "0.0",
+};
 
-  return {
-    totalModelos: Number(modelCount.rows[0].count),
-    verifiedModelos: Number(verifiedCount.rows[0].count),
-    activeFeatured: Number(featuredCount.rows[0].count),
-    totalReviews: Number(reviewStats.rows[0].count),
-    avgRating: reviewStats.rows[0].avg ? Number(reviewStats.rows[0].avg).toFixed(1) : "0.0",
-  };
+export async function getAdminStats(): Promise<AdminStats> {
+  // El dashboard es la landing del panel: si la BD falla puntualmente
+  // (pooler saturado, red) degradamos a ceros y dejamos rastro en el log,
+  // en vez de tumbar la página entera con un 500.
+  try {
+    const [modelCount, verifiedCount, featuredCount, reviewStats] = await Promise.all([
+      pool.query<{ count: string }>("SELECT COUNT(*) FROM models WHERE status <> 'SUSPENDED'"),
+      pool.query<{ count: string }>("SELECT COUNT(*) FROM models WHERE is_verified = true"),
+      pool.query<{ count: string }>(
+        "SELECT COUNT(*) FROM featured_listings WHERE status = 'ACTIVE'",
+      ),
+      pool.query<{ count: string; avg: string | null }>(
+        "SELECT COUNT(*) AS count, AVG(rating) AS avg FROM reviews",
+      ),
+    ]);
+
+    return {
+      totalModelos: Number(modelCount.rows[0].count),
+      verifiedModelos: Number(verifiedCount.rows[0].count),
+      activeFeatured: Number(featuredCount.rows[0].count),
+      totalReviews: Number(reviewStats.rows[0].count),
+      avgRating: reviewStats.rows[0].avg ? Number(reviewStats.rows[0].avg).toFixed(1) : "0.0",
+    };
+  } catch (err) {
+    console.error("[admin] getAdminStats falló:", err instanceof Error ? err.message : err);
+    return EMPTY_ADMIN_STATS;
+  }
 }
 
 export type AnalyticsData = {
