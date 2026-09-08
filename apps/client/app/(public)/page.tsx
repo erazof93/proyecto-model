@@ -9,9 +9,18 @@ import { getFeaturedModelos, getModelos } from "@/lib/db/queries";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  // La home es pública y no debe caer entera si la BD falla puntualmente
+  // (p.ej. límite del pooler de Supabase). Degradamos a listas vacías y
+  // dejamos rastro en el log del servidor en vez de mostrar "Algo salió mal".
   const [featured, recomendadas] = await Promise.all([
-    getFeaturedModelos(),
-    getModelos({ pageSize: 5 }),
+    getFeaturedModelos().catch((err) => {
+      console.error("[home] getFeaturedModelos falló:", err);
+      return [];
+    }),
+    getModelos({ pageSize: 5 }).catch((err) => {
+      console.error("[home] getModelos falló:", err);
+      return { data: [], page: 1, pageSize: 5, total: 0, totalPages: 0 };
+    }),
   ]);
 
   return (

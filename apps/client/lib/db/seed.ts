@@ -1,7 +1,11 @@
 /**
  * Seed de desarrollo sobre TypeORM. Equivalente a apps/supabase/migrations/
  * 002_seed_data.sql pero ejecutable con `pnpm seed` (necesita DATABASE_URL en
- * el entorno). Idempotente: si ya existe el admin, no hace nada.
+ * el entorno).
+ *
+ * Idempotente y ADITIVO: cada entidad se crea sólo si no existe (admin y
+ * customer por username, checklists por nombre, modelos por username), así que
+ * re-ejecutarlo tras ampliar MODEL_NAMES añade únicamente las modelos nuevas.
  *
  *   DATABASE_URL=postgres://... pnpm --filter @proyecto-model/client seed
  */
@@ -23,6 +27,26 @@ const MODEL_NAMES = [
   "Isabella",
   "María",
   "Carolina",
+  "Antonia",
+  "Rosario",
+  "Bárbara",
+  "Francisca",
+  "Gabriela",
+  "Herminia",
+  "Irene",
+  "Jacqueline",
+  "Karina",
+  "Luisa",
+  "Mariana",
+  "Natalia",
+  "Olga",
+  "Patricia",
+  "Quintina",
+  "Ramona",
+  "Susana",
+  "Teresa",
+  "Úrsula",
+  "Verónica",
 ];
 
 const CHECKLIST_NAMES = [
@@ -41,36 +65,48 @@ export async function seedDatabase() {
   const modelChecklists = ds.getRepository(ModelChecklist);
   const reviews = ds.getRepository(Review);
 
-  if (await users.existsBy({ username: "admin" })) {
-    console.log("ℹ️  Ya sembrado (existe el usuario admin). Nada que hacer.");
-    return;
+  // --- Admin (idempotente por username) ---
+  if (!(await users.existsBy({ username: "admin" }))) {
+    await users.save(
+      users.create({
+        email: "admin@modelosmkt.com",
+        username: "admin",
+        password_hash: await hashPassword("admin123"),
+        role: "admin",
+        is_active: true,
+      }),
+    );
   }
 
-  await users.save(
-    users.create({
-      email: "admin@modelosmkt.com",
-      username: "admin",
-      password_hash: await hashPassword("admin123"),
-      role: "admin",
-    }),
-  );
-
-  const checklistRows = await checklists.save(
-    CHECKLIST_NAMES.map((name) =>
+  // --- Checklists (idempotente por nombre) ---
+  const checklistRows: Checklist[] = [];
+  for (const name of CHECKLIST_NAMES) {
+    let row = await checklists.findOne({ where: { name } });
+    row ??= await checklists.save(
       checklists.create({ name, description: `Servicio: ${name}`, is_active: true }),
-    ),
-  );
+    );
+    checklistRows.push(row);
+  }
 
-  const createdModels: Model[] = [];
+  // --- Modelos (idempotente por username) ---
+  let createdModels = 0;
+  const modelsByName = new Map<string, Model>();
   for (let i = 0; i < MODEL_NAMES.length; i++) {
     const name = MODEL_NAMES[i];
     const username = `${generateSlug(name)}_lima`;
+
+    const existing = await models.findOne({ where: { username } });
+    if (existing) {
+      modelsByName.set(name, existing);
+      continue;
+    }
 
     const user = await users.save(
       users.create({
         username,
         password_hash: await hashPassword("password123"),
         role: "model",
+        is_active: true,
       }),
     );
 
@@ -87,7 +123,8 @@ export async function seedDatabase() {
         status: "ACTIVE",
       }),
     );
-    createdModels.push(model);
+    modelsByName.set(name, model);
+    createdModels++;
 
     const assigned = checklistRows.slice(0, 2 + (i % 3));
     await modelChecklists.save(
@@ -99,30 +136,41 @@ export async function seedDatabase() {
     );
   }
 
-  const customer = await users.save(
+  // --- Customer de ejemplo (idempotente por username) ---
+  let customer = await users.findOne({ where: { username: "customer1" } });
+  customer ??= await users.save(
     users.create({
       username: "customer1",
       password_hash: await hashPassword("password123"),
       role: "customer",
+      is_active: true,
     }),
   );
 
-  await reviews.save([
-    reviews.create({
-      model_id: createdModels[0].id,
-      customer_id: customer.id,
-      rating: 5,
-      comment: "Excelente servicio, muy profesional",
-    }),
-    reviews.create({
-      model_id: createdModels[0].id,
-      customer_id: customer.id,
-      rating: 4,
-      comment: "Muy buena experiencia",
-    }),
-  ]);
+  // --- Reviews de ejemplo sobre la primera modelo (idempotente) ---
+  const firstModel = modelsByName.get(MODEL_NAMES[0]);
+  if (firstModel && !(await reviews.existsBy({ model_id: firstModel.id }))) {
+    await reviews.save([
+      reviews.create({
+        model_id: firstModel.id,
+        customer_id: customer.id,
+        rating: 5,
+        comment: "Excelente servicio, muy profesional",
+      }),
+      reviews.create({
+        model_id: firstModel.id,
+        customer_id: customer.id,
+        rating: 4,
+        comment: "Muy buena experiencia",
+      }),
+    ]);
+  }
 
-  console.log(`✅ Seed OK: 1 admin, ${createdModels.length} modelos, ${checklistRows.length} checklists.`);
+  const totalModels = await models.count();
+  console.log(
+    `✅ Seed OK: 1 admin, +${createdModels} modelos nuevas (${totalModels} en total), ` +
+      `${checklistRows.length} checklists.`,
+  );
 }
 
 if (require.main === module) {
