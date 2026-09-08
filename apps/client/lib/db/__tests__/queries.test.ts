@@ -16,6 +16,7 @@ const qbFactory = () => {
     "where",
     "andWhere",
     "orderBy",
+    "addOrderBy",
     "groupBy",
     "skip",
     "take",
@@ -23,6 +24,8 @@ const qbFactory = () => {
     "select",
     "addSelect",
     "leftJoin",
+    "leftJoinAndSelect",
+    "innerJoinAndSelect",
   ];
   for (const m of chain) {
     qb[m] = jest.fn((...args: unknown[]) => {
@@ -54,7 +57,13 @@ jest.mock("../data-source", () => ({
   })),
 }));
 
-import { getModeloBySlug, getModelos, getReviews } from "../queries";
+import {
+  getFeaturedModelos,
+  getFilterOptions,
+  getModeloBySlug,
+  getModelos,
+  getReviews,
+} from "../queries";
 
 /** Última QB creada, para inspeccionar sus llamadas encadenadas. */
 let lastQb: ReturnType<typeof qbFactory>;
@@ -176,5 +185,66 @@ describe("getReviews", () => {
       order: { created_at: "DESC" },
     });
     expect(result).toHaveLength(1);
+  });
+});
+
+describe("getFeaturedModelos", () => {
+  it("se apoya en featured_listings vigentes (ACTIVE + no expiradas) de modelos ACTIVE", async () => {
+    await getFeaturedModelos();
+    const frags = whereFragments();
+    expect(frags).toContain("fl.status = :status");
+    expect(frags).toContain("fl.end_date > NOW()");
+    expect(frags).toContain("m.status = :mstatus");
+    expect(whereParams()).toMatchObject({ status: "ACTIVE", mstatus: "ACTIVE" });
+  });
+
+  it("ordena fijadas primero y devuelve la modelo de cada fila", async () => {
+    mockRepo.createQueryBuilder.mockImplementationOnce(() => {
+      lastQb = qbFactory();
+      (lastQb.getMany as jest.Mock).mockResolvedValue([
+        { id: "fl1", model: { id: "m1", name: "Sofía" } },
+        { id: "fl2", model: { id: "m2", name: "María" } },
+      ]);
+      return lastQb;
+    });
+    const result = await getFeaturedModelos();
+    expect(result.map((m) => m.id)).toEqual(["m1", "m2"]);
+    const orderCalls = (lastQb.__calls as { method: string; args: unknown[] }[])
+      .filter((c) => c.method === "orderBy" || c.method === "addOrderBy")
+      .map((c) => c.args);
+    expect(orderCalls[0]).toEqual(["fl.is_pinned", "DESC"]);
+  });
+});
+
+describe("getFilterOptions", () => {
+  it("devuelve ciudades/géneros de modelos visibles y servicios = checklists activos", async () => {
+    mockRepo.createQueryBuilder
+      .mockImplementationOnce(() => {
+        lastQb = qbFactory();
+        (lastQb.getRawMany as jest.Mock).mockResolvedValue([{ city: "Lima" }, { city: "Callao" }]);
+        return lastQb;
+      })
+      .mockImplementationOnce(() => {
+        lastQb = qbFactory();
+        (lastQb.getRawMany as jest.Mock).mockResolvedValue([{ gender: "WOMAN" }]);
+        return lastQb;
+      });
+    mockRepo.find.mockResolvedValueOnce([{ name: "Masaje" }, { name: "Sesión fotos" }]);
+
+    const result = await getFilterOptions();
+    expect(result).toEqual({
+      cities: ["Lima", "Callao"],
+      genders: ["WOMAN"],
+      services: ["Masaje", "Sesión fotos"],
+    });
+  });
+
+  it("solo mira modelos ACTIVE y verificadas", async () => {
+    await getFilterOptions();
+    // la última QB creada es la de géneros; ambas comparten el mismo prefijo
+    expect(whereFragments()).toEqual(
+      expect.arrayContaining(["m.status = :status", "m.is_verified = :verified"]),
+    );
+    expect(whereParams()).toMatchObject({ status: "ACTIVE", verified: true });
   });
 });

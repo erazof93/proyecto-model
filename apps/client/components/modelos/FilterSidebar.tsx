@@ -2,32 +2,51 @@ import Link from "next/link";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
-import { cities, serviceOptions } from "@/lib/mock-data";
-
-const genders = [
-  { value: "WOMAN", label: "Mujer" },
-  { value: "MAN", label: "Hombre" },
-  { value: "TRANSGENDER", label: "Transexual" },
-];
 
 export type CurrentFilters = { gender?: string; city?: string; service?: string };
+export type FilterOptions = { cities: string[]; genders: string[]; services: string[] };
 
-export function FilterSidebar({ current = {} }: { current?: CurrentFilters }) {
+/** Etiqueta visible de cada valor de género (la lista sí viene de la BD). */
+const GENDER_LABELS: Record<string, string> = {
+  WOMAN: "Mujer",
+  MAN: "Hombre",
+  TRANSGENDER: "Transexual",
+};
+
+export function FilterSidebar({
+  current = {},
+  options,
+}: {
+  current?: CurrentFilters;
+  options?: FilterOptions;
+}) {
+  const genders = options?.genders ?? [];
+  const services = options?.services ?? [];
+  const cities = options?.cities ?? [];
+
   return (
     <aside className="w-full flex-shrink-0 space-y-6 border-border p-6 lg:w-64 lg:border-r">
       <form action="/modelos" method="GET" className="space-y-6">
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-dark/40">Género</p>
           <div className="space-y-2">
+            <Checkbox
+              id="g-all"
+              name="gender"
+              type="radio"
+              value=""
+              label="Todos"
+              defaultChecked={!current.gender}
+            />
             {genders.map((g) => (
               <Checkbox
-                key={g.value}
-                id={`g-${g.value}`}
+                key={g}
+                id={`g-${g}`}
                 name="gender"
                 type="radio"
-                value={g.value}
-                label={g.label}
-                defaultChecked={current.gender === g.value}
+                value={g}
+                label={GENDER_LABELS[g] ?? g}
+                defaultChecked={current.gender === g}
               />
             ))}
           </div>
@@ -35,7 +54,15 @@ export function FilterSidebar({ current = {} }: { current?: CurrentFilters }) {
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-dark/40">Servicio</p>
           <div className="space-y-2">
-            {serviceOptions.slice(0, 2).map((s) => (
+            <Checkbox
+              id="s-all"
+              name="service"
+              type="radio"
+              value=""
+              label="Todos"
+              defaultChecked={!current.service}
+            />
+            {services.map((s) => (
               <Checkbox
                 key={s}
                 id={`s-${s}`}

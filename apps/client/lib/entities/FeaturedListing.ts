@@ -54,6 +54,11 @@ export class FeaturedListing {
   @Column({ type: "boolean", default: false })
   is_pinned!: boolean;
 
+  /** Orden manual en el que el admin coloca las destacadas (0 = primero). */
+  @Index()
+  @Column({ type: "int", default: 0 })
+  order_index!: number;
+
   @Column({ type: "uuid", nullable: true })
   payment_id!: string | null;
 

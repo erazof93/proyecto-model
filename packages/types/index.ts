@@ -83,6 +83,7 @@ export type FeaturedListing = {
   end_date: string;
   status: FeaturedStatus;
   is_pinned: boolean;
+  order_index: number;
   payment_id?: string;
   created_by_admin_id?: string;
   approved_at?: string;

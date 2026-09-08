@@ -1,7 +1,7 @@
 import { SearchFilters } from "@/components/modelos/SearchFilters";
 import { FeaturedCarousel } from "@/components/modelos/FeaturedCarousel";
 import { ModelGrid } from "@/components/modelos/ModelGrid";
-import { getFeaturedModelos, getModelos } from "@/lib/db/queries";
+import { getFeaturedModelos, getFilterOptions, getModelos } from "@/lib/db/queries";
 
 // Lee datos en vivo de Postgres en cada request: sin esto, Next.js
 // prerenderiza esta página una sola vez en build time y sirve esa foto
@@ -12,7 +12,7 @@ export default async function HomePage() {
   // La home es pública y no debe caer entera si la BD falla puntualmente
   // (p.ej. límite del pooler de Supabase). Degradamos a listas vacías y
   // dejamos rastro en el log del servidor en vez de mostrar "Algo salió mal".
-  const [featured, recomendadas] = await Promise.all([
+  const [featured, recomendadas, filterOptions] = await Promise.all([
     getFeaturedModelos().catch((err) => {
       console.error("[home] getFeaturedModelos falló:", err);
       return [];
@@ -21,11 +21,15 @@ export default async function HomePage() {
       console.error("[home] getModelos falló:", err);
       return { data: [], page: 1, pageSize: 5, total: 0, totalPages: 0 };
     }),
+    getFilterOptions().catch((err) => {
+      console.error("[home] getFilterOptions falló:", err);
+      return { cities: [], genders: [], services: [] };
+    }),
   ]);
 
   return (
     <>
-      <SearchFilters />
+      <SearchFilters options={filterOptions} />
       <section className="mx-auto max-w-6xl px-6 py-8">
         <FeaturedCarousel models={featured} />
       </section>

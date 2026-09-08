@@ -114,10 +114,22 @@ function buildDataSource(): DataSource {
     // ("typeorm does not provide an export named 'MigrationInterface'"). Las
     // migraciones son CLI-only -> viven en migrations.datasource.ts.
     subscribers: [],
-    // Vercel serverless: muchas lambdas concurrentes × pool grande agota el
-    // límite de conexiones de Supabase. Cap bajo por instancia; usa la cadena
-    // del *pooler* de Supabase (puerto 6543) en producción.
-    extra: { max: Number(process.env.DB_POOL_MAX ?? 3) },
+    // Pool `pg` (node-postgres). Claves:
+    //  - `max`: conexiones por instancia. Muchas lambdas/HMR × pool grande
+    //    agotan el límite de Supabase → (EMAXCONNSESSION). Cap bajo (1 por
+    //    defecto) y usar SIEMPRE el *transaction pooler* (:6543) de Supabase.
+    //  - `idleTimeoutMillis`: cierra conexiones ociosas rápido para no dejarlas
+    //    "checked out" en el pooler tras un pico o un reinicio de `next dev`.
+    //  - `connectionTimeoutMillis`: falla rápido si el pooler ya está saturado
+    //    en vez de colgar la request.
+    //  - `allowExitOnIdle`: deja salir al proceso (seed/CLI) sin `destroy()`
+    //    explícito y evita conexiones colgando la vida del event loop.
+    extra: {
+      max: Math.max(1, Number(process.env.DB_POOL_MAX ?? 1)),
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000,
+      allowExitOnIdle: true,
+    },
   });
 }
 

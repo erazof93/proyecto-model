@@ -7,6 +7,7 @@ import type {
   ReviewWithCustomer,
 } from "@proyecto-model/types";
 import { Checklist as ChecklistEntity } from "../entities/Checklist";
+import { FeaturedListing as FeaturedListingEntity } from "../entities/FeaturedListing";
 import { Model as ModelEntity } from "../entities/Model";
 import { ModelChecklist as ModelChecklistEntity } from "../entities/ModelChecklist";
 import { ModelPhoto as ModelPhotoEntity } from "../entities/ModelPhoto";
@@ -34,7 +35,7 @@ export type PaginatedModels = {
 /** Modelos activos y verificados, con filtros opcionales y paginación. */
 export async function getModelos(filters?: ModelFilters): Promise<PaginatedModels> {
   const page = Math.max(1, filters?.page ?? 1);
-  const pageSize = Math.min(50, Math.max(1, filters?.pageSize ?? 8));
+  const pageSize = Math.min(50, Math.max(1, filters?.pageSize ?? 20));
 
   const repo = await getRepo(ModelEntity);
   const qb = repo
@@ -82,18 +83,68 @@ export async function getModeloBySlug(slug: string): Promise<Model | null> {
   return (row as unknown as Model) ?? null;
 }
 
-/** Modelos destacadas vigentes (is_featured + featured_expires_at futuro). */
+/**
+ * Modelos destacadas: se controlan 100% desde `featured_listings` (alta/orden
+ * gestionados por el admin). Solo cuentan las filas ACTIVE y sin expirar cuya
+ * modelo esté a su vez ACTIVE. Orden: fijadas primero, luego `order_index`.
+ */
 export async function getFeaturedModelos(): Promise<Model[]> {
-  const repo = await getRepo(ModelEntity);
+  const repo = await getRepo(FeaturedListingEntity);
   const rows = await repo
-    .createQueryBuilder("m")
-    .where("m.is_featured = :featured", { featured: true })
-    .andWhere("m.status = :status", { status: "ACTIVE" })
-    .andWhere("(m.featured_expires_at IS NULL OR m.featured_expires_at > NOW())")
-    .orderBy("m.created_at", "DESC")
-    .limit(10)
+    .createQueryBuilder("fl")
+    .innerJoinAndSelect("fl.model", "m")
+    .where("fl.status = :status", { status: "ACTIVE" })
+    .andWhere("fl.end_date > NOW()")
+    .andWhere("m.status = :mstatus", { mstatus: "ACTIVE" })
+    .orderBy("fl.is_pinned", "DESC")
+    .addOrderBy("fl.order_index", "ASC")
+    .addOrderBy("fl.created_at", "DESC")
+    .take(20)
     .getMany();
-  return rows as unknown as Model[];
+  return rows.map((r) => r.model) as unknown as Model[];
+}
+
+/**
+ * Opciones para los filtros públicos, derivadas de la BD (cero hardcodeo):
+ * ciudades y géneros presentes en modelos visibles, y servicios = nombres de
+ * los checklists activos (la fuente de verdad de servicios).
+ */
+export async function getFilterOptions(): Promise<{
+  cities: string[];
+  genders: string[];
+  services: string[];
+}> {
+  const modelRepo = await getRepo(ModelEntity);
+  const visible = () =>
+    modelRepo
+      .createQueryBuilder("m")
+      .where("m.status = :status", { status: "ACTIVE" })
+      .andWhere("m.is_verified = :verified", { verified: true });
+
+  const [cityRows, genderRows, checklistRepo] = [
+    await visible()
+      .select("DISTINCT m.city", "city")
+      .andWhere("m.city IS NOT NULL")
+      .orderBy("m.city", "ASC")
+      .getRawMany<{ city: string }>(),
+    await visible()
+      .select("DISTINCT m.gender", "gender")
+      .orderBy("m.gender", "ASC")
+      .getRawMany<{ gender: string }>(),
+    await getRepo(ChecklistEntity),
+  ];
+
+  const checklists = await checklistRepo.find({
+    where: { is_active: true },
+    order: { name: "ASC" },
+    select: { name: true },
+  });
+
+  return {
+    cities: cityRows.map((r) => r.city).filter(Boolean),
+    genders: genderRows.map((r) => r.gender).filter(Boolean),
+    services: checklists.map((c) => c.name),
+  };
 }
 
 export async function getReviews(modelId: string): Promise<Review[]> {
