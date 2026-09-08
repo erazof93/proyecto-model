@@ -32,9 +32,8 @@ test.describe("Modelo dashboard", () => {
 
   test("fotos page shows the real upload control and gallery", async ({ page }) => {
     await page.goto("/modelo/dashboard/fotos");
-    // El botón vive dentro del render-prop de CldUploadWidget, que solo
-    // monta sus children después de cargar el script externo de Cloudinary
-    // -- más lento que el timeout por defecto en un cold start.
+    // El botón dispara un <input type="file"> oculto y postea FormData a
+    // /api/modelos/fotos (upload server-side a Supabase Storage).
     await expect(page.getByRole("button", { name: "Subir foto" })).toBeVisible({
       timeout: 15_000,
     });

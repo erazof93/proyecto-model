@@ -7,6 +7,13 @@ export async function photoBelongsToModel(photoId: string, modelId: string): Pro
   return repo.existsBy({ id: photoId, model_id: modelId });
 }
 
+/** Devuelve la foto de la modelo (o null). Útil para leer su path de storage antes de borrar. */
+export async function getModelPhoto(photoId: string, modelId: string): Promise<ModelPhoto | null> {
+  const repo = await getRepo(ModelPhotoEntity);
+  const row = await repo.findOne({ where: { id: photoId, model_id: modelId } });
+  return (row as unknown as ModelPhoto) ?? null;
+}
+
 /** Añade una foto al final del orden actual de la modelo. */
 export async function addModelPhoto(
   modelId: string,

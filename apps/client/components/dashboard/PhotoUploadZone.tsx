@@ -1,42 +1,40 @@
 "use client";
 
-import { useState } from "react";
-import { CldUploadWidget, type CldUploadWidgetResults } from "next-cloudinary";
+import { useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { ModelPhoto } from "@proyecto-model/types";
+
+const ACCEPTED = "image/jpeg,image/png,image/webp";
 
 export function PhotoUploadZone({
   onUploadSuccess,
 }: {
   onUploadSuccess: (photo: ModelPhoto) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  async function handleUpload(result: CldUploadWidgetResults) {
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // permite re-subir el mismo archivo
+    if (!file) return;
+
     setError("");
-    if (!result.info || typeof result.info === "string") return;
-
-    const info = result.info as { public_id: string; secure_url: string };
-    const cloudinary_id = info.public_id;
-    const cloudinary_url = info.secure_url;
-
+    setUploading(true);
     try {
-      setUploading(true);
-      const res = await fetch("/api/modelos/fotos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cloudinary_id, cloudinary_url }),
-      });
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/modelos/fotos", { method: "POST", body: formData });
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? "Error al guardar la foto");
+        throw new Error(data?.error ?? "Error al subir la foto");
       }
-      const data = await res.json();
       onUploadSuccess(data.photo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar la foto");
+      setError(err instanceof Error ? err.message : "Error al subir la foto");
     } finally {
       setUploading(false);
     }
@@ -49,20 +47,24 @@ export function PhotoUploadZone({
           {error}
         </div>
       )}
-      <CldUploadWidget
-        uploadPreset={process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET}
-        onSuccess={handleUpload}
-        onError={(err) => setError(typeof err === "string" ? err : "Error al subir la foto")}
-      >
-        {({ open }) => (
-          <div className="flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-border bg-white p-10 text-center text-dark/50">
-            <UploadCloud className="h-8 w-8" />
-            <Button type="button" onClick={() => open()} loading={uploading}>
-              Subir foto
-            </Button>
-          </div>
-        )}
-      </CldUploadWidget>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPTED}
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      <div className="flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-border bg-white p-10 text-center text-dark/50">
+        <UploadCloud className="h-8 w-8" />
+        <p className="text-xs">JPG, PNG o WebP · máx. 10MB</p>
+        <Button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          loading={uploading}
+        >
+          Subir foto
+        </Button>
+      </div>
     </div>
   );
 }
