@@ -8,7 +8,7 @@ const nextConfig = {
   // Marcarlo como external evita que el bundler de server intente resolver
   // esos require() opcionales y rompa el build. `pg` (driver real) y `bcryptjs`
   // (usa require dinámico de crypto) van también fuera del bundle serverless.
-  serverExternalPackages: ["typeorm"],  // ← Solo typeorm
+  serverExternalPackages: ["typeorm", "pg", "bcryptjs"],
   // Permite consumir los packages TS del monorepo sin pre-compilarlos
   transpilePackages: [
     "@proyecto-model/types",
