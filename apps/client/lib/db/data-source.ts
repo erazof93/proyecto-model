@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import "pg";
 import { DataSource } from "typeorm";
 // Imports por-fichero (no el barrel "../entities"): el CLI de TypeORM corre
 // este módulo con ts-node y el resolver de Node no soporta "directory imports"
