@@ -1,13 +1,23 @@
 import Link from "next/link";
+import { Star } from "lucide-react";
 import type { Model } from "@proyecto-model/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
-export function ModelCard({ model }: { model: Model }) {
+export function ModelCard({ model, featured = false }: { model: Model; featured?: boolean }) {
   return (
     <Card className="flex flex-col overflow-hidden" data-testid={`model-card-${model.slug}`}>
       <div className="relative flex h-56 items-end bg-gradient-to-br from-dark/40 to-primary p-3">
+        {featured && (
+          <span
+            className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-gradient-to-br from-primary to-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-md ring-1 ring-white/25"
+            aria-label="Modelo destacada VIP"
+          >
+            <Star className="h-3 w-3 fill-current" aria-hidden />
+            VIP
+          </span>
+        )}
         <span className="text-xs font-medium text-white/80">Foto principal</span>
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">

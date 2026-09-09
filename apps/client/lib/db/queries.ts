@@ -14,6 +14,7 @@ import { ModelPhoto as ModelPhotoEntity } from "../entities/ModelPhoto";
 import { Review as ReviewEntity } from "../entities/Review";
 import { User as UserEntity } from "../entities/User";
 import { entityName, getRepo, initializeDataSource } from "./data-source";
+import { applyWeeklyRotation } from "./helpers";
 
 export type ModelFilters = {
   gender?: string;
@@ -22,6 +23,8 @@ export type ModelFilters = {
   search?: string;
   page?: number;
   pageSize?: number;
+  /** Ordena primero las modelos con una destacada TOP vigente (badge VIP). */
+  featuredFirst?: boolean;
 };
 
 export type PaginatedModels = {
@@ -58,8 +61,19 @@ export async function getModelos(filters?: ModelFilters): Promise<PaginatedModel
     });
   }
 
+  if (filters?.featuredFirst) {
+    // Las modelos con una destacada TOP vigente van primero. ORDER BY sobre un
+    // booleano (EXISTS) — sin parámetros de usuario, todo son literales.
+    qb.orderBy(
+      "(EXISTS (SELECT 1 FROM featured_listings fl WHERE fl.model_id = m.id " +
+        "AND fl.type = 'TOP' AND fl.status = 'ACTIVE' AND fl.end_date > NOW()))",
+      "DESC",
+    ).addOrderBy("m.created_at", "DESC");
+  } else {
+    qb.orderBy("m.created_at", "DESC");
+  }
+
   const [rows, total] = await qb
-    .orderBy("m.created_at", "DESC")
     .skip((page - 1) * pageSize)
     .take(pageSize)
     .getManyAndCount();
@@ -70,6 +84,118 @@ export async function getModelos(filters?: ModelFilters): Promise<PaginatedModel
     pageSize,
     total,
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+export type OrderedModels = PaginatedModels & {
+  /** Ids del tramo TOP (destacadas vigentes) → badge VIP en la card. */
+  featuredIds: string[];
+};
+
+const HAS_ACTIVE_TOP = `EXISTS (SELECT 1 FROM featured_listings fl WHERE fl.model_id = m.id AND fl.type = 'TOP' AND fl.status = 'ACTIVE' AND fl.end_date > NOW())`;
+const RECENT_ACTIVITY = `(EXISTS (SELECT 1 FROM model_interactions mi WHERE mi.model_id = m.id AND mi.created_at > NOW() - INTERVAL '1 month') OR EXISTS (SELECT 1 FROM model_photos mp WHERE mp.model_id = m.id AND mp.created_at > NOW() - INTERVAL '2 months'))`;
+
+/**
+ * Listado ordenado de /modelos en 5 tramos de prioridad. Cada tramo es su
+ * propia query SQL; se concatenan por prioridad, se deduplican (una modelo
+ * aparece solo en su tramo más alto), se filtran y se paginan.
+ *
+ *   1. TOP        — destacada TOP vigente (orden: fijadas, luego order_index)
+ *   2. NUEVAS     — creadas hace < 7 días
+ *   3. POST-VIP   — su TOP expiró hace < 7 días (colchón tras el destaque)
+ *   4. ACTIVAS    — con click < 1 mes o foto < 2 meses → ROTACIÓN SEMANAL
+ *   5. INACTIVAS  — sin actividad → al final, pero NUNCA desaparecen
+ *
+ * Solo `status = 'ACTIVE'` y verificadas. Los filtros y la paginación se
+ * aplican en memoria: el conjunto ya viene acotado y ordenado desde SQL.
+ */
+export async function getModelosOrdenados(filters?: {
+  page?: number;
+  pageSize?: number;
+  city?: string;
+  gender?: string;
+  service?: string;
+  search?: string;
+}): Promise<OrderedModels> {
+  const ds = await initializeDataSource();
+  const page = Math.max(1, filters?.page ?? 1);
+  const pageSize = Math.min(50, Math.max(1, filters?.pageSize ?? 20));
+
+  const BASE = `m.status = 'ACTIVE' AND m.is_verified = true`;
+
+  const [top, nuevas, postVip, activas, inactivas] = (await Promise.all([
+    ds.query(
+      `SELECT m.*, bool_or(fl.is_pinned) AS _pinned, min(fl.order_index) AS _ord
+       FROM models m
+       JOIN featured_listings fl ON fl.model_id = m.id
+       WHERE ${BASE} AND fl.type = 'TOP' AND fl.status = 'ACTIVE' AND fl.end_date > NOW()
+       GROUP BY m.id
+       ORDER BY _pinned DESC, _ord ASC`,
+    ),
+    ds.query(
+      `SELECT m.* FROM models m
+       WHERE ${BASE} AND m.created_at > NOW() - INTERVAL '7 days' AND NOT ${HAS_ACTIVE_TOP}
+       ORDER BY m.created_at DESC`,
+    ),
+    ds.query(
+      `SELECT m.* FROM models m
+       WHERE ${BASE} AND NOT ${HAS_ACTIVE_TOP}
+         AND EXISTS (SELECT 1 FROM featured_listings fl WHERE fl.model_id = m.id AND fl.type = 'TOP'
+                     AND fl.end_date < NOW() AND fl.end_date > NOW() - INTERVAL '7 days')
+       ORDER BY (SELECT max(fl.end_date) FROM featured_listings fl
+                 WHERE fl.model_id = m.id AND fl.type = 'TOP') DESC`,
+    ),
+    ds.query(
+      `SELECT m.* FROM models m
+       WHERE ${BASE} AND m.created_at <= NOW() - INTERVAL '7 days'
+         AND NOT ${HAS_ACTIVE_TOP} AND ${RECENT_ACTIVITY}`,
+    ),
+    ds.query(
+      `SELECT m.* FROM models m
+       WHERE ${BASE} AND m.created_at <= NOW() - INTERVAL '7 days'
+         AND NOT ${HAS_ACTIVE_TOP} AND NOT ${RECENT_ACTIVITY}`,
+    ),
+  ])) as Model[][];
+
+  const featuredIds = top.map((m) => m.id);
+
+  const combined: Model[] = [
+    ...top,
+    ...nuevas,
+    ...postVip,
+    ...applyWeeklyRotation(activas),
+    ...inactivas,
+  ];
+
+  // Dedup: la modelo se queda en su tramo más alto.
+  const seen = new Set<string>();
+  let list = combined.filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true)));
+
+  const q = filters?.search?.trim().toLowerCase();
+  if (filters?.gender) list = list.filter((m) => m.gender === filters.gender);
+  if (filters?.city) {
+    const c = filters.city;
+    list = list.filter((m) => m.city === c || m.cities_travel?.includes(c));
+  }
+  if (filters?.service) {
+    list = list.filter((m) => m.services?.includes(filters.service as string));
+  }
+  if (q) {
+    list = list.filter(
+      (m) => m.name.toLowerCase().includes(q) || (m.bio ?? "").toLowerCase().includes(q),
+    );
+  }
+
+  const total = list.length;
+  const offset = (page - 1) * pageSize;
+
+  return {
+    data: list.slice(offset, offset + pageSize),
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    featuredIds,
   };
 }
 

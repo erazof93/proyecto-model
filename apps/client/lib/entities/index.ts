@@ -3,6 +3,7 @@ export { Checklist } from "./Checklist";
 export { FeaturedListing } from "./FeaturedListing";
 export { Model } from "./Model";
 export { ModelChecklist } from "./ModelChecklist";
+export { ModelInteraction } from "./ModelInteraction";
 export { ModelPhoto } from "./ModelPhoto";
 export { Review } from "./Review";
 export { Transaction } from "./Transaction";

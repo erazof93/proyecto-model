@@ -1,8 +1,9 @@
-import { BadgeCheck, MessageCircle, Instagram, Music2, Send, Star } from "lucide-react";
+import { BadgeCheck, Star } from "lucide-react";
 import type { Model, Review } from "@proyecto-model/types";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ContactButtons } from "@/components/modelos/ContactButtons";
 
 export function ModelProfile({ model, reviews }: { model: Model; reviews: Review[] }) {
   return (
@@ -38,22 +39,13 @@ export function ModelProfile({ model, reviews }: { model: Model; reviews: Review
 
         <div>
           <h2 className="mb-2 font-semibold text-dark">Contacto</h2>
-          <div className="space-y-2">
-            <Button fullWidth className="justify-start gap-2">
-              <MessageCircle className="h-4 w-4" /> Contactar por WhatsApp
-            </Button>
-            <div className="grid grid-cols-3 gap-2">
-              <Button variant="secondary" className="gap-2">
-                <Instagram className="h-4 w-4" /> Instagram
-              </Button>
-              <Button variant="secondary" className="gap-2">
-                <Music2 className="h-4 w-4" /> TikTok
-              </Button>
-              <Button variant="secondary" className="gap-2">
-                <Send className="h-4 w-4" /> Telegram
-              </Button>
-            </div>
-          </div>
+          <ContactButtons
+            modelId={model.id}
+            whatsapp={model.whatsapp}
+            instagram={model.instagram}
+            tiktok={model.tiktok}
+            telegram={model.telegram}
+          />
         </div>
 
         <div>

@@ -50,10 +50,13 @@ const mockRepo = {
   delete: jest.fn().mockResolvedValue({}),
 };
 
+const mockDsQuery = jest.fn();
+
 jest.mock("../data-source", () => ({
   getRepo: jest.fn(async () => mockRepo),
   initializeDataSource: jest.fn(async () => ({
     transaction: jest.fn(),
+    query: mockDsQuery,
   })),
 }));
 
@@ -62,6 +65,7 @@ import {
   getFilterOptions,
   getModeloBySlug,
   getModelos,
+  getModelosOrdenados,
   getReviews,
 } from "../queries";
 
@@ -148,6 +152,30 @@ describe("getModelos", () => {
     });
     const result = await getModelos();
     expect(result.data[0]).not.toHaveProperty("total_count");
+  });
+
+  it("sin featuredFirst ordena solo por m.created_at DESC", async () => {
+    await getModelos();
+    const orderCalls = (lastQb.__calls as QbCall[]).filter(
+      (c) => c.method === "orderBy" || c.method === "addOrderBy",
+    );
+    expect(orderCalls).toEqual([{ method: "orderBy", args: ["m.created_at", "DESC"] }]);
+  });
+
+  it("featuredFirst antepone las modelos con una destacada TOP vigente", async () => {
+    await getModelos({ featuredFirst: true });
+    const orderCalls = (lastQb.__calls as QbCall[]).filter(
+      (c) => c.method === "orderBy" || c.method === "addOrderBy",
+    );
+    const primary = String(orderCalls[0]?.args[0]);
+    expect(primary).toContain("EXISTS");
+    expect(primary).toContain("featured_listings");
+    expect(primary).toContain("fl.type = 'TOP'");
+    expect(primary).toContain("fl.status = 'ACTIVE'");
+    expect(orderCalls[0]?.args[1]).toBe("DESC");
+    expect(orderCalls[1]).toEqual({ method: "addOrderBy", args: ["m.created_at", "DESC"] });
+    // sin interpolar valores de usuario
+    expect(primary).not.toMatch(/\$\{/);
   });
 });
 
@@ -264,5 +292,90 @@ describe("getFilterOptions", () => {
       expect.arrayContaining(["m.status = :status", "m.is_verified = :verified"]),
     );
     expect(whereParams()).toMatchObject({ status: "ACTIVE", verified: true });
+  });
+});
+
+describe("getModelosOrdenados", () => {
+  const M = (id: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    name: `M${id}`,
+    gender: "WOMAN",
+    city: "Lima",
+    services: [],
+    cities_travel: [],
+    bio: null,
+    ...extra,
+  });
+
+  /** Deja listos los 5 tramos (top, nuevas, postVip, activas, inactivas). */
+  const setTramos = (t: {
+    top?: unknown[];
+    nuevas?: unknown[];
+    postVip?: unknown[];
+    activas?: unknown[];
+    inactivas?: unknown[];
+  }) => {
+    mockDsQuery
+      .mockResolvedValueOnce(t.top ?? [])
+      .mockResolvedValueOnce(t.nuevas ?? [])
+      .mockResolvedValueOnce(t.postVip ?? [])
+      .mockResolvedValueOnce(t.activas ?? [])
+      .mockResolvedValueOnce(t.inactivas ?? []);
+  };
+
+  it("concatena los tramos por prioridad: TOP → NUEVAS → POST-VIP → ACTIVAS → INACTIVAS", async () => {
+    setTramos({
+      top: [M("t1")],
+      nuevas: [M("n1")],
+      postVip: [M("p1")],
+      activas: [M("a1")],
+      inactivas: [M("i1")],
+    });
+    const r = await getModelosOrdenados({ pageSize: 50 });
+    expect(r.data.map((m) => m.id)).toEqual(["t1", "n1", "p1", "a1", "i1"]);
+    expect(r.featuredIds).toEqual(["t1"]);
+  });
+
+  it("las INACTIVAS quedan al final pero no desaparecen", async () => {
+    setTramos({ top: [M("t1")], inactivas: [M("i1"), M("i2")] });
+    const r = await getModelosOrdenados({ pageSize: 50 });
+    expect(r.data.map((m) => m.id)).toEqual(["t1", "i1", "i2"]);
+  });
+
+  it("deduplica: una modelo en dos tramos se queda en el más alto", async () => {
+    setTramos({ nuevas: [M("x")], activas: [M("x")], inactivas: [M("y")] });
+    const r = await getModelosOrdenados({ pageSize: 50 });
+    expect(r.data.map((m) => m.id)).toEqual(["x", "y"]);
+    expect(r.total).toBe(2);
+  });
+
+  it("filtra por gender/city/service/search en memoria", async () => {
+    setTramos({
+      activas: [
+        M("a", { gender: "WOMAN", city: "Lima", services: ["Masaje"], name: "Ana" }),
+        M("b", { gender: "MAN", city: "Lima", services: ["Masaje"], name: "Beto" }),
+        M("c", { gender: "WOMAN", city: "Callao", services: ["Fotos"], name: "Ana Lu" }),
+      ],
+    });
+    const r = await getModelosOrdenados({ gender: "WOMAN", city: "Lima", pageSize: 50 });
+    expect(r.data.map((m) => m.id)).toEqual(["a"]);
+  });
+
+  it("pagina sobre el resultado ya ordenado", async () => {
+    setTramos({ activas: [M("1"), M("2"), M("3"), M("4"), M("5")] });
+    const r = await getModelosOrdenados({ page: 2, pageSize: 2 });
+    expect(r.data.map((m) => m.id)).toEqual(["3", "4"]);
+    expect(r.total).toBe(5);
+    expect(r.totalPages).toBe(3);
+  });
+
+  it("la 1ª query (tramo TOP) agrupa por modelo y ordena por fijadas + order_index", async () => {
+    setTramos({});
+    await getModelosOrdenados();
+    const topSql = String(mockDsQuery.mock.calls[0][0]);
+    expect(topSql).toContain("GROUP BY m.id");
+    expect(topSql).toContain("fl.type = 'TOP'");
+    expect(topSql).toContain("fl.end_date > NOW()");
+    expect(topSql).toContain("ORDER BY _pinned DESC, _ord ASC");
   });
 });

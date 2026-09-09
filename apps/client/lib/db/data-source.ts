@@ -12,6 +12,7 @@ import { Checklist } from "../entities/Checklist";
 import { FeaturedListing } from "../entities/FeaturedListing";
 import { Model } from "../entities/Model";
 import { ModelChecklist } from "../entities/ModelChecklist";
+import { ModelInteraction } from "../entities/ModelInteraction";
 import { ModelPhoto } from "../entities/ModelPhoto";
 import { Review } from "../entities/Review";
 import { Transaction } from "../entities/Transaction";
@@ -96,6 +97,7 @@ const ENTITIES = [
   FeaturedListing,
   Checklist,
   ModelChecklist,
+  ModelInteraction,
   Transaction,
   AuthLog,
 ];

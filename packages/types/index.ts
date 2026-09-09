@@ -20,7 +20,17 @@ export enum ModelStatus {
   PENDING = "PENDING",
   ACTIVE = "ACTIVE",
   SUSPENDED = "SUSPENDED",
+  ARCHIVED = "ARCHIVED",
 }
+
+export type InteractionType = "WHATSAPP_CLICK" | "INSTAGRAM_CLICK" | "PROFILE_VIEW";
+
+export type ModelInteraction = {
+  id: string;
+  model_id: string;
+  interaction_type: InteractionType;
+  created_at: string;
+};
 
 export enum FeaturedStatus {
   ACTIVE = "ACTIVE",

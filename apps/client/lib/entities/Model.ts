@@ -95,11 +95,11 @@ export class Model {
 
   @Column({
     type: "enum",
-    enum: ["PENDING", "ACTIVE", "SUSPENDED"],
+    enum: ["PENDING", "ACTIVE", "SUSPENDED", "ARCHIVED"],
     enumName: "model_status_enum",
     default: "PENDING",
   })
-  status!: "PENDING" | "ACTIVE" | "SUSPENDED";
+  status!: "PENDING" | "ACTIVE" | "SUSPENDED" | "ARCHIVED";
 
   @Column({ type: "boolean", default: false })
   is_featured!: boolean;
