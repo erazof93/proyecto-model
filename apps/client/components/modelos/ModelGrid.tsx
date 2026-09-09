@@ -19,7 +19,9 @@ export function ModelGrid({
   return (
     <div
       className={cn(
-        "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+        // Responsivo: 2 col en móvil, 3 en tablet, 4 en desktop; gap más
+        // ajustado en móvil.
+        "grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-4",
         className,
       )}
     >

@@ -162,6 +162,18 @@ describe("getModelos", () => {
     expect(orderCalls).toEqual([{ method: "orderBy", args: ["m.created_at", "DESC"] }]);
   });
 
+  it("isNew acota a las creadas en los últimos 7 días (literal, sin params)", async () => {
+    await getModelos({ isNew: true });
+    const frag = whereFragments().find((f) => f.includes("created_at"));
+    expect(frag).toBe("m.created_at > NOW() - INTERVAL '7 days'");
+    expect(frag).not.toMatch(/:\w|\$\{/);
+  });
+
+  it("sin isNew no añade el filtro de fecha", async () => {
+    await getModelos();
+    expect(whereFragments().some((f) => f.includes("INTERVAL"))).toBe(false);
+  });
+
   it("featuredFirst antepone las modelos con una destacada TOP vigente", async () => {
     await getModelos({ featuredFirst: true });
     const orderCalls = (lastQb.__calls as QbCall[]).filter(
@@ -347,6 +359,25 @@ describe("getModelosOrdenados", () => {
     const r = await getModelosOrdenados({ pageSize: 50 });
     expect(r.data.map((m) => m.id)).toEqual(["x", "y"]);
     expect(r.total).toBe(2);
+  });
+
+  it("isNew deja solo las creadas en los últimos 7 días", async () => {
+    const reciente = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const vieja = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
+    setTramos({
+      nuevas: [M("new", { created_at: reciente })],
+      activas: [M("old", { created_at: vieja })],
+    });
+    const r = await getModelosOrdenados({ isNew: true, pageSize: 50 });
+    expect(r.data.map((m) => m.id)).toEqual(["new"]);
+    expect(r.total).toBe(1);
+  });
+
+  it("sin isNew no filtra por fecha", async () => {
+    const vieja = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
+    setTramos({ activas: [M("old", { created_at: vieja })] });
+    const r = await getModelosOrdenados({ pageSize: 50 });
+    expect(r.data.map((m) => m.id)).toEqual(["old"]);
   });
 
   it("filtra por gender/city/service/search en memoria", async () => {

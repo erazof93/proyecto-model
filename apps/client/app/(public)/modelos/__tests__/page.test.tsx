@@ -45,8 +45,23 @@ it("pasa los filtros de searchParams a getModelosOrdenados", async () => {
     city: "Lima",
     service: undefined,
     search: "sofia",
+    isNew: false,
     page: 2,
   });
+});
+
+it("?isNew=true activa el filtro; combina con otros filtros", async () => {
+  await ModelosPage({
+    searchParams: Promise.resolve({ city: "Lima", isNew: "true" }),
+  });
+  expect(mockOrdenados).toHaveBeenCalledWith(
+    expect.objectContaining({ city: "Lima", isNew: true }),
+  );
+});
+
+it("isNew con cualquier otro valor no activa el filtro", async () => {
+  await ModelosPage({ searchParams: Promise.resolve({ isNew: "1" }) });
+  expect(mockOrdenados).toHaveBeenCalledWith(expect.objectContaining({ isNew: false }));
 });
 
 it("propaga featuredIds del resultado como set de badges VIP (no lanza)", async () => {

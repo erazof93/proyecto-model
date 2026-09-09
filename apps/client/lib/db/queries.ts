@@ -25,6 +25,8 @@ export type ModelFilters = {
   pageSize?: number;
   /** Ordena primero las modelos con una destacada TOP vigente (badge VIP). */
   featuredFirst?: boolean;
+  /** Solo modelos creadas en los últimos 7 días ("Nuevas integrantes"). */
+  isNew?: boolean;
 };
 
 export type PaginatedModels = {
@@ -59,6 +61,9 @@ export async function getModelos(filters?: ModelFilters): Promise<PaginatedModel
     qb.andWhere("(m.name ILIKE :search OR m.bio ILIKE :search)", {
       search: `%${filters.search}%`,
     });
+  }
+  if (filters?.isNew) {
+    qb.andWhere("m.created_at > NOW() - INTERVAL '7 days'");
   }
 
   if (filters?.featuredFirst) {
@@ -116,6 +121,8 @@ export async function getModelosOrdenados(filters?: {
   gender?: string;
   service?: string;
   search?: string;
+  /** Solo modelos creadas en los últimos 7 días (checkbox "Solo nuevas"). */
+  isNew?: boolean;
 }): Promise<OrderedModels> {
   const ds = await initializeDataSource();
   const page = Math.max(1, filters?.page ?? 1);
@@ -179,6 +186,10 @@ export async function getModelosOrdenados(filters?: {
   }
   if (filters?.service) {
     list = list.filter((m) => m.services?.includes(filters.service as string));
+  }
+  if (filters?.isNew) {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    list = list.filter((m) => new Date(m.created_at).getTime() > cutoff);
   }
   if (q) {
     list = list.filter(

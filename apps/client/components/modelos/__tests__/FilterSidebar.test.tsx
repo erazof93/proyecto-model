@@ -50,4 +50,20 @@ describe("FilterSidebar", () => {
     expect(todoFor("service")).toBeChecked();
     expect(screen.queryByLabelText("Sesión fotos")).not.toBeInTheDocument();
   });
+
+  describe("checkbox 'Solo nuevas integrantes'", () => {
+    it("es un checkbox name=isNew value=true, desmarcado por defecto", () => {
+      render(<FilterSidebar options={options} />);
+      const cb = screen.getByLabelText("Solo nuevas integrantes") as HTMLInputElement;
+      expect(cb).toHaveAttribute("name", "isNew");
+      expect(cb).toHaveAttribute("value", "true");
+      expect(cb.type).toBe("checkbox");
+      expect(cb).not.toBeChecked();
+    });
+
+    it("queda marcado cuando current.isNew es true", () => {
+      render(<FilterSidebar current={{ isNew: true }} options={options} />);
+      expect(screen.getByLabelText("Solo nuevas integrantes")).toBeChecked();
+    });
+  });
 });

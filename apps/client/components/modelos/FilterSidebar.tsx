@@ -3,7 +3,12 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 
-export type CurrentFilters = { gender?: string; city?: string; service?: string };
+export type CurrentFilters = {
+  gender?: string;
+  city?: string;
+  service?: string;
+  isNew?: boolean;
+};
 export type FilterOptions = { cities: string[]; genders: string[]; services: string[] };
 
 /** Etiqueta visible de cada valor de género (la lista sí viene de la BD). */
@@ -85,6 +90,15 @@ export function FilterSidebar({
               </option>
             ))}
           </Select>
+        </div>
+        <div>
+          <Checkbox
+            id="f-isnew"
+            name="isNew"
+            value="true"
+            label="Solo nuevas integrantes"
+            defaultChecked={current.isNew ?? false}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Button type="submit">Aplicar</Button>

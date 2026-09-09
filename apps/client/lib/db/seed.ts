@@ -48,6 +48,10 @@ const MODEL_NAMES = [
   "Teresa",
   "Úrsula",
   "Verónica",
+  "Wendy",
+  "Xiomara",
+  "Yolanda",
+  "Zayra",
 ];
 
 const CHECKLIST_NAMES = [
