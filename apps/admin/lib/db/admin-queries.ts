@@ -178,6 +178,11 @@ export async function createFeaturedListing(
     [endDate, modelId],
   );
 
+  // Comprar un TOP (VIP) verifica automáticamente a la modelo.
+  if (type === "TOP") {
+    await pool.query("UPDATE models SET is_verified = true WHERE id = $1", [modelId]);
+  }
+
   return result.rows[0];
 }
 

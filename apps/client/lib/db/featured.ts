@@ -94,10 +94,11 @@ export async function addFeaturedListing(input: FeaturedInput): Promise<Featured
     .select("COALESCE(MAX(fl.order_index), -1)", "max")
     .getRawOne<{ max: string }>()) ?? { max: "-1" };
 
+  const type = (input.type ?? "TOP") as "TOP" | "BANNER";
   const saved = await repo.save(
     repo.create({
       model_id: input.model_id,
-      type: (input.type ?? "TOP") as "TOP" | "BANNER",
+      type,
       price: String(input.price ?? 0),
       duration_days: durationDays,
       end_date: endDate,
@@ -108,6 +109,13 @@ export async function addFeaturedListing(input: FeaturedInput): Promise<Featured
       approved_at: new Date(),
     }),
   );
+
+  // Comprar un TOP (VIP) verifica automáticamente a la modelo.
+  if (type === "TOP") {
+    const modelRepo = await getRepo(ModelEntity);
+    await modelRepo.update({ id: input.model_id }, { is_verified: true } as Partial<ModelEntity>);
+  }
+
   return saved as unknown as FeaturedListing;
 }
 

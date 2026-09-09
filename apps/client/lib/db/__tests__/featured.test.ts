@@ -37,6 +37,7 @@ const mockRepo = {
   }),
   create: jest.fn((x: unknown) => x),
   save: jest.fn(async (x: unknown) => ({ id: "fl-1", ...(x as object) })),
+  update: jest.fn().mockResolvedValue({ affected: 1 }),
   findOne: jest.fn().mockResolvedValue(null),
   delete: jest.fn().mockResolvedValue({ affected: 1 }),
   existsBy: jest.fn().mockResolvedValue(true),
@@ -62,6 +63,7 @@ beforeEach(() => {
   });
   mockRepo.findOne.mockResolvedValue(null);
   mockRepo.delete.mockResolvedValue({ affected: 1 });
+  mockRepo.update.mockResolvedValue({ affected: 1 });
   mockRepo.existsBy.mockResolvedValue(true);
 });
 
@@ -109,6 +111,16 @@ describe("addFeaturedListing", () => {
     const arg = mockRepo.create.mock.calls[0][0] as Record<string, unknown>;
     expect(arg.type).toBe("BANNER");
     expect(arg.duration_days).toBe(7);
+  });
+
+  it("un TOP verifica automáticamente a la modelo (is_verified = true)", async () => {
+    await addFeaturedListing({ model_id: "m1" }); // type por defecto = TOP
+    expect(mockRepo.update).toHaveBeenCalledWith({ id: "m1" }, { is_verified: true });
+  });
+
+  it("un BANNER NO verifica a la modelo", async () => {
+    await addFeaturedListing({ model_id: "m1", type: "BANNER" });
+    expect(mockRepo.update).not.toHaveBeenCalled();
   });
 
   it("ignora duration_days no positivo y vuelve a 30", async () => {

@@ -67,6 +67,7 @@ import {
   getModelos,
   getModelosOrdenados,
   getReviews,
+  getVipCarousel,
 } from "../queries";
 
 /** Última QB creada, para inspeccionar sus llamadas encadenadas. */
@@ -98,12 +99,11 @@ const whereParams = () =>
   );
 
 describe("getModelos", () => {
-  it("only queries active, verified models by default", async () => {
+  it("solo filtra por status ACTIVE (verificada = badge, no filtro de visibilidad)", async () => {
     await getModelos();
-    expect(whereFragments()).toEqual(
-      expect.arrayContaining(["m.status = :status", "m.is_verified = :verified"]),
-    );
-    expect(whereParams()).toMatchObject({ status: "ACTIVE", verified: true });
+    expect(whereFragments()).toEqual(["m.status = :status"]);
+    expect(whereFragments().join(" ")).not.toContain("is_verified");
+    expect(whereParams()).toMatchObject({ status: "ACTIVE" });
   });
 
   it("adds a gender filter as a named parameter, never string-interpolated", async () => {
@@ -274,6 +274,34 @@ describe("getFeaturedModelos", () => {
   });
 });
 
+describe("getVipCarousel", () => {
+  it("toma hasta `limit` de las destacadas TOP vigentes", async () => {
+    mockRepo.createQueryBuilder.mockImplementationOnce(() => {
+      lastQb = qbFactory();
+      (lastQb.getMany as jest.Mock).mockResolvedValue(
+        Array.from({ length: 12 }, (_, i) => ({ model: { id: `v${i}`, name: `V${i}` } })),
+      );
+      return lastQb;
+    });
+    const out = await getVipCarousel(8);
+    expect(out).toHaveLength(8);
+    expect(whereFragments()).toContain("fl.type = :type");
+    expect(whereParams()).toMatchObject({ type: "TOP" });
+  });
+
+  it("si hay menos VIP que `limit`, devuelve todas", async () => {
+    mockRepo.createQueryBuilder.mockImplementationOnce(() => {
+      lastQb = qbFactory();
+      (lastQb.getMany as jest.Mock).mockResolvedValue([
+        { model: { id: "v1" } },
+        { model: { id: "v2" } },
+      ]);
+      return lastQb;
+    });
+    expect(await getVipCarousel(8)).toHaveLength(2);
+  });
+});
+
 describe("getFilterOptions", () => {
   it("devuelve ciudades/géneros de modelos visibles y servicios = checklists activos", async () => {
     mockRepo.createQueryBuilder
@@ -297,13 +325,12 @@ describe("getFilterOptions", () => {
     });
   });
 
-  it("solo mira modelos ACTIVE y verificadas", async () => {
+  it("solo mira modelos ACTIVE (sin filtrar por verificación)", async () => {
     await getFilterOptions();
     // la última QB creada es la de géneros; ambas comparten el mismo prefijo
-    expect(whereFragments()).toEqual(
-      expect.arrayContaining(["m.status = :status", "m.is_verified = :verified"]),
-    );
-    expect(whereParams()).toMatchObject({ status: "ACTIVE", verified: true });
+    expect(whereFragments()).toEqual(expect.arrayContaining(["m.status = :status"]));
+    expect(whereFragments().join(" ")).not.toContain("is_verified");
+    expect(whereParams()).toMatchObject({ status: "ACTIVE" });
   });
 });
 
@@ -400,6 +427,37 @@ describe("getModelosOrdenados", () => {
     expect(r.totalPages).toBe(3);
   });
 
+  it("type='TOP' deja SOLO las VIP (tramo TOP); combina con otros filtros", async () => {
+    setTramos({
+      top: [
+        M("vip1", { gender: "WOMAN", city: "Lima" }),
+        M("vip2", { gender: "MAN", city: "Lima" }),
+      ],
+      activas: [M("free1", { gender: "WOMAN", city: "Lima" })],
+    });
+    const soloVip = await getModelosOrdenados({ type: "TOP", pageSize: 50 });
+    expect(soloVip.data.map((m) => m.id)).toEqual(["vip1", "vip2"]);
+    expect(soloVip.total).toBe(2);
+  });
+
+  it("type='TOP' + gender aplica ambos filtros", async () => {
+    setTramos({
+      top: [
+        M("vip1", { gender: "WOMAN" }),
+        M("vip2", { gender: "MAN" }),
+      ],
+      activas: [M("free1", { gender: "WOMAN" })],
+    });
+    const r = await getModelosOrdenados({ type: "TOP", gender: "WOMAN", pageSize: 50 });
+    expect(r.data.map((m) => m.id)).toEqual(["vip1"]);
+  });
+
+  it("sin type devuelve todos los tramos", async () => {
+    setTramos({ top: [M("vip1")], activas: [M("free1")] });
+    const r = await getModelosOrdenados({ pageSize: 50 });
+    expect(r.data.map((m) => m.id)).toEqual(["vip1", "free1"]);
+  });
+
   it("la 1ª query (tramo TOP) agrupa por modelo y ordena por fijadas + order_index", async () => {
     setTramos({});
     await getModelosOrdenados();
@@ -408,5 +466,13 @@ describe("getModelosOrdenados", () => {
     expect(topSql).toContain("fl.type = 'TOP'");
     expect(topSql).toContain("fl.end_date > NOW()");
     expect(topSql).toContain("ORDER BY _pinned DESC, _ord ASC");
+  });
+
+  it("no filtra por is_verified en ningún tramo (verificada = badge)", async () => {
+    setTramos({});
+    await getModelosOrdenados();
+    for (const call of mockDsQuery.mock.calls) {
+      expect(String(call[0])).not.toContain("is_verified");
+    }
   });
 });

@@ -14,7 +14,7 @@ import { ModelPhoto as ModelPhotoEntity } from "../entities/ModelPhoto";
 import { Review as ReviewEntity } from "../entities/Review";
 import { User as UserEntity } from "../entities/User";
 import { entityName, getRepo, initializeDataSource } from "./data-source";
-import { applyWeeklyRotation } from "./helpers";
+import { applyWeeklyRotation, hourlySample } from "./helpers";
 
 export type ModelFilters = {
   gender?: string;
@@ -43,10 +43,9 @@ export async function getModelos(filters?: ModelFilters): Promise<PaginatedModel
   const pageSize = Math.min(50, Math.max(1, filters?.pageSize ?? 20));
 
   const repo = await getRepo(ModelEntity);
-  const qb = repo
-    .createQueryBuilder("m")
-    .where("m.status = :status", { status: "ACTIVE" })
-    .andWhere("m.is_verified = :verified", { verified: true });
+  // Se muestran TODAS las modelos ACTIVE, verificadas o no: `is_verified` es un
+  // badge (✓ verde en la card), no un filtro de visibilidad.
+  const qb = repo.createQueryBuilder("m").where("m.status = :status", { status: "ACTIVE" });
 
   if (filters?.gender) {
     qb.andWhere("m.gender = :gender", { gender: filters.gender });
@@ -123,12 +122,15 @@ export async function getModelosOrdenados(filters?: {
   search?: string;
   /** Solo modelos creadas en los últimos 7 días (checkbox "Solo nuevas"). */
   isNew?: boolean;
+  /** "TOP" → solo VIP (destacada TOP vigente); undefined → todas. */
+  type?: "TOP";
 }): Promise<OrderedModels> {
   const ds = await initializeDataSource();
   const page = Math.max(1, filters?.page ?? 1);
   const pageSize = Math.min(50, Math.max(1, filters?.pageSize ?? 20));
 
-  const BASE = `m.status = 'ACTIVE' AND m.is_verified = true`;
+  // Sin `is_verified`: se muestran todas las ACTIVE (verificada = badge, no filtro).
+  const BASE = `m.status = 'ACTIVE'`;
 
   const [top, nuevas, postVip, activas, inactivas] = (await Promise.all([
     ds.query(
@@ -179,6 +181,11 @@ export async function getModelosOrdenados(filters?: {
   let list = combined.filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true)));
 
   const q = filters?.search?.trim().toLowerCase();
+  if (filters?.type === "TOP") {
+    // Solo VIP: las del tramo TOP (destacada TOP vigente).
+    const vips = new Set(featuredIds);
+    list = list.filter((m) => vips.has(m.id));
+  }
   if (filters?.gender) list = list.filter((m) => m.gender === filters.gender);
   if (filters?.city) {
     const c = filters.city;
@@ -258,6 +265,16 @@ export async function getFeaturedModelos(filters?: {
 }
 
 /**
+ * Carrusel "TOP Destacadas" de la home: hasta `limit` VIP (destacadas TOP
+ * vigentes) elegidas con `hourlySample`, así la selección ROTA cada hora y es
+ * la misma para todos sin caché. Devuelve objetos planos (vía getFeaturedModelos).
+ */
+export async function getVipCarousel(limit = 8): Promise<Model[]> {
+  const vips = await getFeaturedModelos({ type: "TOP" });
+  return hourlySample(vips, limit);
+}
+
+/**
  * Opciones para los filtros públicos, derivadas de la BD (cero hardcodeo):
  * ciudades y géneros presentes en modelos visibles, y servicios = nombres de
  * los checklists activos (la fuente de verdad de servicios).
@@ -269,10 +286,7 @@ export async function getFilterOptions(): Promise<{
 }> {
   const modelRepo = await getRepo(ModelEntity);
   const visible = () =>
-    modelRepo
-      .createQueryBuilder("m")
-      .where("m.status = :status", { status: "ACTIVE" })
-      .andWhere("m.is_verified = :verified", { verified: true });
+    modelRepo.createQueryBuilder("m").where("m.status = :status", { status: "ACTIVE" });
 
   const [cityRows, genderRows, checklistRepo] = [
     await visible()

@@ -8,6 +8,7 @@ export type CurrentFilters = {
   city?: string;
   service?: string;
   isNew?: boolean;
+  type?: "TOP";
 };
 export type FilterOptions = { cities: string[]; genders: string[]; services: string[] };
 
@@ -89,6 +90,13 @@ export function FilterSidebar({
                 {c}
               </option>
             ))}
+          </Select>
+        </div>
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-dark/40">Tipo</p>
+          <Select name="type" defaultValue={current.type ?? ""} aria-label="Tipo">
+            <option value="">Todas las modelos</option>
+            <option value="TOP">Solo VIP destacadas</option>
           </Select>
         </div>
         <div>

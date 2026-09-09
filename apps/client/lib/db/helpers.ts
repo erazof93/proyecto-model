@@ -1,4 +1,5 @@
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 
 /** Hash entero estable de un string (variante de String.hashCode, con Math.imul
  *  para no desbordar a float). Mismo string → mismo número, siempre. */
@@ -23,4 +24,21 @@ export function applyWeeklyRotation<T extends { id: string }>(models: T[]): T[] 
   return [...models].sort(
     (a, b) => hashCode(`${week}:${a.id}`) - hashCode(`${week}:${b.id}`),
   );
+}
+
+/**
+ * Muestra determinística de `limit` elementos que ROTA cada hora: dentro de la
+ * misma hora todos los usuarios (y todas las instancias serverless) ven la
+ * misma selección; al pasar de hora cambia por completo. No necesita caché.
+ */
+export function hourlySample<T extends { id: string }>(items: T[], limit: number): T[] {
+  const hour = Math.floor(Date.now() / HOUR_MS);
+  return [...items]
+    .sort((a, b) => hashCode(`${hour}:${a.id}`) - hashCode(`${hour}:${b.id}`))
+    .slice(0, Math.max(0, limit));
+}
+
+/** Instante (epoch ms) en que `hourlySample` producirá una selección nueva. */
+export function nextHourlyRefresh(): number {
+  return (Math.floor(Date.now() / HOUR_MS) + 1) * HOUR_MS;
 }

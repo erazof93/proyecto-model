@@ -10,6 +10,7 @@ export default async function ModelosPage({ searchParams }: { searchParams: Sear
   const params = await searchParams;
   const page = Number(params.page) || 1;
   const isNew = params.isNew === "true";
+  const type = params.type === "TOP" ? "TOP" : undefined;
 
   const [result, filterOptions] = await Promise.all([
     // 5 tramos de prioridad + rotación semanal en "activas"; las inactivas van
@@ -20,6 +21,7 @@ export default async function ModelosPage({ searchParams }: { searchParams: Sear
       service: params.service,
       search: params.q,
       isNew,
+      type,
       page,
     }).catch((err) => {
       console.error("[modelos] getModelosOrdenados falló:", err);
@@ -43,7 +45,13 @@ export default async function ModelosPage({ searchParams }: { searchParams: Sear
       </div>
       <div className="mx-auto flex max-w-6xl flex-col lg:flex-row">
         <FilterSidebar
-          current={{ gender: params.gender, city: params.city, service: params.service, isNew }}
+          current={{
+            gender: params.gender,
+            city: params.city,
+            service: params.service,
+            isNew,
+            type,
+          }}
           options={filterOptions}
         />
         <div className="flex-1 px-6 py-6">

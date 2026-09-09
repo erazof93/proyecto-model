@@ -4,10 +4,16 @@ export function Pagination({
   page,
   totalPages,
   searchParams = {},
+  basePath = "/modelos",
+  hash = "",
 }: {
   page: number;
   totalPages: number;
   searchParams?: Record<string, string | undefined>;
+  /** Ruta base de los enlaces (p.ej. "/" para la home). */
+  basePath?: string;
+  /** Ancla opcional para volver a la sección tras navegar (p.ej. "#recomendadas"). */
+  hash?: string;
 }) {
   const hrefForPage = (target: number) => {
     const params = new URLSearchParams();
@@ -15,7 +21,7 @@ export function Pagination({
       if (value) params.set(key, value);
     }
     params.set("page", String(target));
-    return `/modelos?${params.toString()}`;
+    return `${basePath}?${params.toString()}${hash}`;
   };
 
   const hasPrev = page > 1;

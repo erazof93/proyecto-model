@@ -33,3 +33,26 @@ describe("ModelCard — badge VIP", () => {
     expect(screen.getByRole("link")).toHaveAttribute("href", "/modelos/sofia-martinez");
   });
 });
+
+describe("ModelCard — badge Verificada", () => {
+  it("no muestra el badge si la modelo no está verificada", () => {
+    render(<ModelCard model={{ ...model, is_verified: false }} />);
+    expect(screen.queryByLabelText("Modelo verificada")).not.toBeInTheDocument();
+  });
+
+  it("muestra el badge verde 'Verificada' cuando is_verified", () => {
+    render(<ModelCard model={{ ...model, is_verified: true }} />);
+    const badge = screen.getByLabelText("Modelo verificada");
+    expect(badge).toHaveTextContent("Verificada");
+    expect(badge.className).toContain("bg-emerald-500");
+    // esquina inferior derecha
+    expect(badge.className).toMatch(/bottom-2/);
+    expect(badge.className).toMatch(/right-2/);
+  });
+
+  it("VIP + verificada conviven (badges en esquinas distintas)", () => {
+    render(<ModelCard model={{ ...model, is_verified: true }} featured />);
+    expect(screen.getByLabelText("Modelo destacada VIP").className).toMatch(/top-2/);
+    expect(screen.getByLabelText("Modelo verificada").className).toMatch(/bottom-2/);
+  });
+});

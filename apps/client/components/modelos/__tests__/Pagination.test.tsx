@@ -35,4 +35,32 @@ describe("Pagination", () => {
     expect(screen.queryByRole("link", { name: /Siguiente/ })).not.toBeInTheDocument();
     expect(screen.getByText(/Siguiente/)).toBeInTheDocument();
   });
+
+  it("respeta basePath y hash (uso en la home)", () => {
+    render(
+      <Pagination
+        page={2}
+        totalPages={4}
+        searchParams={{ page: "2" }}
+        basePath="/"
+        hash="#recomendadas"
+      />,
+    );
+    expect(screen.getByRole("link", { name: /Retroceder/ })).toHaveAttribute(
+      "href",
+      "/?page=1#recomendadas",
+    );
+    expect(screen.getByRole("link", { name: /Siguiente/ })).toHaveAttribute(
+      "href",
+      "/?page=3#recomendadas",
+    );
+  });
+
+  it("basePath por defecto sigue siendo /modelos", () => {
+    render(<Pagination page={1} totalPages={2} />);
+    expect(screen.getByRole("link", { name: /Siguiente/ })).toHaveAttribute(
+      "href",
+      "/modelos?page=2",
+    );
+  });
 });

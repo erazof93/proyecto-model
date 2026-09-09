@@ -51,6 +51,21 @@ describe("FilterSidebar", () => {
     expect(screen.queryByLabelText("Sesión fotos")).not.toBeInTheDocument();
   });
 
+  describe("filtro 'Tipo' (Solo VIP)", () => {
+    it("ofrece 'Todas las modelos' (default) y 'Solo VIP destacadas' con valor TOP", () => {
+      render(<FilterSidebar options={options} />);
+      const sel = screen.getByLabelText("Tipo") as HTMLSelectElement;
+      expect(sel.name).toBe("type");
+      expect(sel.value).toBe("");
+      expect(screen.getByRole("option", { name: "Solo VIP destacadas" })).toHaveValue("TOP");
+    });
+
+    it("queda en 'Solo VIP' cuando current.type es 'TOP'", () => {
+      render(<FilterSidebar current={{ type: "TOP" }} options={options} />);
+      expect((screen.getByLabelText("Tipo") as HTMLSelectElement).value).toBe("TOP");
+    });
+  });
+
   describe("checkbox 'Solo nuevas integrantes'", () => {
     it("es un checkbox name=isNew value=true, desmarcado por defecto", () => {
       render(<FilterSidebar options={options} />);

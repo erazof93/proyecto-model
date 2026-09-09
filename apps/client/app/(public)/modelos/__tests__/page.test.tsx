@@ -46,6 +46,7 @@ it("pasa los filtros de searchParams a getModelosOrdenados", async () => {
     service: undefined,
     search: "sofia",
     isNew: false,
+    type: undefined,
     page: 2,
   });
 });
@@ -62,6 +63,18 @@ it("?isNew=true activa el filtro; combina con otros filtros", async () => {
 it("isNew con cualquier otro valor no activa el filtro", async () => {
   await ModelosPage({ searchParams: Promise.resolve({ isNew: "1" }) });
   expect(mockOrdenados).toHaveBeenCalledWith(expect.objectContaining({ isNew: false }));
+});
+
+it("?type=TOP activa el filtro VIP; combina con otros filtros", async () => {
+  await ModelosPage({ searchParams: Promise.resolve({ type: "TOP", city: "Lima" }) });
+  expect(mockOrdenados).toHaveBeenCalledWith(
+    expect.objectContaining({ type: "TOP", city: "Lima" }),
+  );
+});
+
+it("type con un valor que no sea 'TOP' se ignora", async () => {
+  await ModelosPage({ searchParams: Promise.resolve({ type: "BANNER" }) });
+  expect(mockOrdenados).toHaveBeenCalledWith(expect.objectContaining({ type: undefined }));
 });
 
 it("propaga featuredIds del resultado como set de badges VIP (no lanza)", async () => {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Star } from "lucide-react";
+import { BadgeCheck, Star } from "lucide-react";
 import type { Model } from "@proyecto-model/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -16,6 +16,15 @@ export function ModelCard({ model, featured = false }: { model: Model; featured?
           >
             <Star className="h-3 w-3 fill-current" aria-hidden />
             VIP
+          </span>
+        )}
+        {model.is_verified && (
+          <span
+            className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white shadow-md ring-1 ring-white/25"
+            aria-label="Modelo verificada"
+          >
+            <BadgeCheck className="h-3 w-3" aria-hidden />
+            Verificada
           </span>
         )}
         <span className="text-xs font-medium text-white/80">Foto principal</span>
