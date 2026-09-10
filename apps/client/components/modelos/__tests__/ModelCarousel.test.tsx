@@ -40,7 +40,8 @@ describe("ModelCarousel", () => {
     expect(track.className).toMatch(/\bflex\b/);
     expect(track.className).not.toMatch(/md:grid/);
     const item = track.firstElementChild as HTMLElement;
-    expect(item.className).toContain("w-[78%]");
+    // ~2 cards visibles en móvil (igual que la grid de "recomendadas"), 4 en desktop.
+    expect(item.className).toContain("w-[47%]");
     expect(item.className).toContain("lg:w-1/4");
   });
 

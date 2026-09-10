@@ -1,4 +1,4 @@
-import type { ModelPhoto } from "@proyecto-model/types";
+import type { ModelPhoto, PhotoType } from "@proyecto-model/types";
 import { ModelPhoto as ModelPhotoEntity } from "../entities/ModelPhoto";
 import { getRepo } from "./data-source";
 
@@ -19,12 +19,13 @@ export async function addModelPhoto(
   modelId: string,
   cloudinaryId: string,
   cloudinaryUrl: string,
+  type: PhotoType = "photo",
 ): Promise<ModelPhoto> {
   const repo = await getRepo(ModelPhotoEntity);
   const { max } = (await repo
     .createQueryBuilder("p")
     .select("COALESCE(MAX(p.order_index), 0)", "max")
-    .where("p.model_id = :modelId", { modelId })
+    .where("p.model_id = :modelId AND p.type = :type", { modelId, type })
     .getRawOne<{ max: string }>()) ?? { max: "0" };
 
   const saved = await repo.save(
@@ -32,12 +33,26 @@ export async function addModelPhoto(
       model_id: modelId,
       cloudinary_id: cloudinaryId,
       cloudinary_url: cloudinaryUrl,
+      type,
       is_verified: false,
       is_primary: false,
       order_index: Number(max) + 1,
     }),
   );
   return saved as unknown as ModelPhoto;
+}
+
+/** Fotos de la modelo de un tipo concreto (incluye `cloudinary_id` para limpiar storage). */
+export async function getModelPhotosByType(
+  modelId: string,
+  type: PhotoType,
+): Promise<ModelPhoto[]> {
+  const repo = await getRepo(ModelPhotoEntity);
+  const rows = await repo.find({
+    where: { model_id: modelId, type },
+    order: { order_index: "ASC" },
+  });
+  return rows as unknown as ModelPhoto[];
 }
 
 /** Marca (o desmarca) una foto como principal; sólo una por modelo. */

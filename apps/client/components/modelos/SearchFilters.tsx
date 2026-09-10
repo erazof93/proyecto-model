@@ -2,59 +2,72 @@ import { Search } from "lucide-react";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { FilterDrawer } from "@/components/modelos/FilterDrawer";
 
 export type FilterOptions = { cities: string[]; genders: string[]; services: string[] };
 
-/** Etiqueta visible de cada valor de género del enum (la lista de opciones sí
- *  viene de la BD; esto solo traduce los códigos conocidos). */
-const GENDER_LABELS: Record<string, string> = {
-  WOMAN: "Mujer",
-  MAN: "Hombre",
-  TRANSGENDER: "Transexual",
-};
+const searchPlaceholder = "Buscar por nombre, usuario, ciudad o servicio…";
 
-export function SearchFilters({ options }: { options?: FilterOptions }) {
+/**
+ * Barra de búsqueda pública (home). El filtro de género vive ahora en el Header
+ * (global); aquí solo se arrastra como campo oculto para no perderlo al enviar
+ * el formulario. `currentGender` viene de la URL; por defecto "WOMAN" (Mujer).
+ */
+export function SearchFilters({
+  options,
+  currentGender = "WOMAN",
+}: {
+  options?: FilterOptions;
+  currentGender?: string;
+}) {
   const cities = options?.cities ?? [];
-  const genders = options?.genders ?? [];
-  const services = options?.services ?? [];
 
   return (
-    <form action="/modelos" method="GET" className="border-b border-border bg-white px-6 py-6">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4">
-        <div className="relative ml-auto w-full max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dark/30" />
-          <Input name="q" placeholder="Buscar..." className="pl-9" />
-        </div>
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <Select name="gender" label="Género" defaultValue="" className="sm:w-48">
-            <option value="">Todos</option>
-            {genders.map((g) => (
-              <option key={g} value={g}>
-                {GENDER_LABELS[g] ?? g}
-              </option>
-            ))}
-          </Select>
-          <Select name="service" label="Servicio" defaultValue="" className="sm:w-56">
-            <option value="">Todos</option>
-            {services.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </Select>
-          <Select name="city" label="Ciudad" defaultValue="" className="sm:w-40">
-            <option value="">Todas</option>
+    <>
+      {/* Desktop: búsqueda + ciudad */}
+      <form
+        action="/modelos"
+        method="GET"
+        className="hidden border-b border-border bg-white px-6 py-5 md:block"
+      >
+        <input type="hidden" name="gender" value={currentGender} />
+        <div className="mx-auto flex max-w-6xl items-end gap-3">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-dark/30" />
+            <Input
+              name="q"
+              autoComplete="off"
+              placeholder={searchPlaceholder}
+              className="w-full pl-9"
+            />
+          </div>
+          <Select name="city" defaultValue="" aria-label="Ciudad" className="w-48">
+            <option value="">Todas las ciudades</option>
             {cities.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
             ))}
           </Select>
-          <Button type="submit" className="sm:w-auto">
-            Buscar
-          </Button>
+          <Button type="submit">Buscar</Button>
         </div>
+      </form>
+
+      {/* Mobile: input de búsqueda (Enter envía) + botón que abre el drawer de filtros. */}
+      <div className="flex items-center gap-2 border-b border-border bg-white px-4 py-4 md:hidden">
+        <form action="/modelos" method="GET" className="relative flex-1">
+          <input type="hidden" name="gender" value={currentGender} />
+          <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-dark/30" />
+          <Input
+            name="q"
+            autoComplete="off"
+            placeholder="Buscar…"
+            className="w-full pl-9"
+            aria-label="Buscar"
+          />
+        </form>
+        <FilterDrawer options={options} />
       </div>
-    </form>
+    </>
   );
 }

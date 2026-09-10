@@ -8,16 +8,9 @@ export type CurrentFilters = {
   city?: string;
   service?: string;
   isNew?: boolean;
-  type?: "TOP";
+  type?: "TOP" | "BANNER";
 };
 export type FilterOptions = { cities: string[]; genders: string[]; services: string[] };
-
-/** Etiqueta visible de cada valor de género (la lista sí viene de la BD). */
-const GENDER_LABELS: Record<string, string> = {
-  WOMAN: "Mujer",
-  MAN: "Hombre",
-  TRANSGENDER: "Transexual",
-};
 
 export function FilterSidebar({
   current = {},
@@ -26,37 +19,15 @@ export function FilterSidebar({
   current?: CurrentFilters;
   options?: FilterOptions;
 }) {
-  const genders = options?.genders ?? [];
   const services = options?.services ?? [];
   const cities = options?.cities ?? [];
 
   return (
-    <aside className="w-full flex-shrink-0 space-y-6 border-border p-6 lg:w-64 lg:border-r">
+    <aside className="hidden w-full flex-shrink-0 space-y-6 border-border p-6 lg:block lg:w-64 lg:border-r">
       <form action="/modelos" method="GET" className="space-y-6">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-dark/40">Género</p>
-          <div className="space-y-2">
-            <Checkbox
-              id="g-all"
-              name="gender"
-              type="radio"
-              value=""
-              label="Todos"
-              defaultChecked={!current.gender}
-            />
-            {genders.map((g) => (
-              <Checkbox
-                key={g}
-                id={`g-${g}`}
-                name="gender"
-                type="radio"
-                value={g}
-                label={GENDER_LABELS[g] ?? g}
-                defaultChecked={current.gender === g}
-              />
-            ))}
-          </div>
-        </div>
+        {/* Género se controla desde el Header (GenderTabs). Se arrastra oculto
+            para no perderlo al aplicar el resto de filtros. */}
+        <input type="hidden" name="gender" value={current.gender ?? ""} />
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-dark/40">Servicio</p>
           <div className="space-y-2">
@@ -97,6 +68,7 @@ export function FilterSidebar({
           <Select name="type" defaultValue={current.type ?? ""} aria-label="Tipo">
             <option value="">Todas las modelos</option>
             <option value="TOP">Solo VIP destacadas</option>
+            <option value="BANNER">Solo BANNER</option>
           </Select>
         </div>
         <div>

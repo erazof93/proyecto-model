@@ -34,6 +34,32 @@ describe("ModelCard — badge VIP", () => {
   });
 });
 
+describe("ModelCard — proporción del media", () => {
+  it("portrait por defecto: 3:4 en móvil y desktop (consistente HOME + /modelos)", () => {
+    const { container } = render(<ModelCard model={model} />);
+    expect(container.querySelector(".aspect-\\[3\\/4\\]")).toBeInTheDocument();
+    expect(container.querySelector(".md\\:aspect-square")).not.toBeInTheDocument();
+    expect(container.querySelector(".aspect-video")).not.toBeInTheDocument();
+  });
+
+  it("imageAspectRatio sobreescribe la proporción del media en portrait", () => {
+    const { container } = render(
+      <ModelCard model={model} imageAspectRatio="h-56 md:aspect-square" />,
+    );
+    expect(container.querySelector(".h-56")).toBeInTheDocument();
+    expect(container.querySelector(".md\\:aspect-square")).toBeInTheDocument();
+    expect(container.querySelector(".aspect-\\[3\\/4\\]")).not.toBeInTheDocument();
+  });
+
+  it("variant='wide': 16:9 (ignora imageAspectRatio)", () => {
+    const { container } = render(
+      <ModelCard model={model} variant="wide" imageAspectRatio="h-56 md:aspect-square" />,
+    );
+    expect(container.querySelector(".aspect-video")).toBeInTheDocument();
+    expect(container.querySelector(".h-56")).not.toBeInTheDocument();
+  });
+});
+
 describe("ModelCard — badge Verificada", () => {
   it("no muestra el badge si la modelo no está verificada", () => {
     render(<ModelCard model={{ ...model, is_verified: false }} />);

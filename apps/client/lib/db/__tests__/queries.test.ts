@@ -65,6 +65,7 @@ import {
   getFilterOptions,
   getModeloBySlug,
   getModelos,
+  getModelosBySearch,
   getModelosOrdenados,
   getReviews,
   getVipCarousel,
@@ -452,6 +453,31 @@ describe("getModelosOrdenados", () => {
     expect(r.data.map((m) => m.id)).toEqual(["vip1"]);
   });
 
+  it("type='BANNER' deja SOLO las que tienen destacada BANNER vigente", async () => {
+    setTramos({
+      top: [M("vip1")],
+      activas: [M("b1"), M("b2"), M("nope")],
+    });
+    // 6ª query (solo cuando type=BANNER): ids con destacada BANNER vigente.
+    mockDsQuery.mockResolvedValueOnce([{ id: "b1" }, { id: "b2" }]);
+
+    const r = await getModelosOrdenados({ type: "BANNER", pageSize: 50 });
+
+    expect(r.data.map((m) => m.id).sort()).toEqual(["b1", "b2"]);
+    expect(r.data.map((m) => m.id)).not.toContain("nope");
+    expect(r.data.map((m) => m.id)).not.toContain("vip1");
+    expect(r.total).toBe(2);
+    const bannerSql = String(mockDsQuery.mock.calls[5][0]);
+    expect(bannerSql).toContain("fl.type = 'BANNER'");
+    expect(bannerSql).toContain("fl.end_date > NOW()");
+  });
+
+  it("sin type='BANNER' no lanza la query extra de banners", async () => {
+    setTramos({ activas: [M("a1")] });
+    await getModelosOrdenados({ pageSize: 50 });
+    expect(mockDsQuery).toHaveBeenCalledTimes(5);
+  });
+
   it("sin type devuelve todos los tramos", async () => {
     setTramos({ top: [M("vip1")], activas: [M("free1")] });
     const r = await getModelosOrdenados({ pageSize: 50 });
@@ -474,5 +500,36 @@ describe("getModelosOrdenados", () => {
     for (const call of mockDsQuery.mock.calls) {
       expect(String(call[0])).not.toContain("is_verified");
     }
+  });
+});
+
+describe("getModelosBySearch", () => {
+  it("con término en blanco devuelve [] sin tocar la BD", async () => {
+    expect(await getModelosBySearch("   ")).toEqual([]);
+    expect(mockDsQuery).not.toHaveBeenCalled();
+  });
+
+  it("matchea nombre, username, ciudad y servicios; parametrizado y solo ACTIVE", async () => {
+    mockDsQuery.mockResolvedValueOnce([{ id: "a" }]);
+    const rows = await getModelosBySearch("Masaje");
+
+    expect(rows).toEqual([{ id: "a" }]);
+    const [sql, params] = mockDsQuery.mock.calls[0];
+    expect(String(sql)).toContain("m.status = 'ACTIVE'");
+    expect(String(sql)).toContain("LOWER(m.name) LIKE $1");
+    expect(String(sql)).toContain("LOWER(m.username) LIKE $1");
+    expect(String(sql)).toContain("LOWER(COALESCE(m.city, '')) LIKE $1");
+    expect(String(sql)).toContain("LOWER(COALESCE(c.name, '')) LIKE $1");
+    expect(String(sql)).toContain("unnest(COALESCE(m.services, '{}'))");
+    expect(String(sql)).not.toContain("is_verified");
+    // El término va como parámetro $1 (nunca interpolado), en minúsculas y con %.
+    expect(params[0]).toBe("%masaje%");
+    expect(params[1]).toBe(20);
+  });
+
+  it("acota el limit al rango [1, 50]", async () => {
+    mockDsQuery.mockResolvedValue([]);
+    await getModelosBySearch("x", 999);
+    expect(mockDsQuery.mock.calls[0][1][1]).toBe(50);
   });
 });

@@ -122,8 +122,12 @@ export async function getModelosOrdenados(filters?: {
   search?: string;
   /** Solo modelos creadas en los últimos 7 días (checkbox "Solo nuevas"). */
   isNew?: boolean;
-  /** "TOP" → solo VIP (destacada TOP vigente); undefined → todas. */
-  type?: "TOP";
+  /**
+   * "TOP"    → solo VIP (destacada TOP vigente),
+   * "BANNER" → solo las del carrusel BANNER de la home (destacada BANNER vigente),
+   * undefined → todas.
+   */
+  type?: "TOP" | "BANNER";
 }): Promise<OrderedModels> {
   const ds = await initializeDataSource();
   const page = Math.max(1, filters?.page ?? 1);
@@ -168,6 +172,18 @@ export async function getModelosOrdenados(filters?: {
 
   const featuredIds = top.map((m) => m.id);
 
+  // Ids con destacada BANNER vigente (para type=BANNER). Solo se consulta cuando
+  // hace falta; el resto de llamadas no pagan esta query extra.
+  const bannerIds = new Set<string>(
+    filters?.type === "BANNER"
+      ? ((await ds.query(
+          `SELECT m.id FROM models m
+           JOIN featured_listings fl ON fl.model_id = m.id
+           WHERE ${BASE} AND fl.type = 'BANNER' AND fl.status = 'ACTIVE' AND fl.end_date > NOW()`,
+        )) as { id: string }[]).map((r) => r.id)
+      : [],
+  );
+
   const combined: Model[] = [
     ...top,
     ...nuevas,
@@ -185,6 +201,9 @@ export async function getModelosOrdenados(filters?: {
     // Solo VIP: las del tramo TOP (destacada TOP vigente).
     const vips = new Set(featuredIds);
     list = list.filter((m) => vips.has(m.id));
+  } else if (filters?.type === "BANNER") {
+    // Solo las del carrusel BANNER (destacada BANNER vigente).
+    list = list.filter((m) => bannerIds.has(m.id));
   }
   if (filters?.gender) list = list.filter((m) => m.gender === filters.gender);
   if (filters?.city) {
@@ -215,6 +234,48 @@ export async function getModelosOrdenados(filters?: {
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
     featuredIds,
   };
+}
+
+/**
+ * Búsqueda combinada del input público (home + /modelos): matchea el término
+ * contra nombre, username, ciudad y servicios de la modelo. Los servicios se
+ * revisan por dos vías porque pueden vivir en cualquiera de las dos: el array
+ * `models.services` y los checklists asignados (`checklists.name`).
+ *
+ * Es un match de texto plano, sin los 5 tramos de prioridad de
+ * getModelosOrdenados: cuando hay término de búsqueda lo que importa es acertar
+ * el match, no el ranking. Solo modelos `status = 'ACTIVE'`.
+ */
+export async function getModelosBySearch(query: string, limit = 20): Promise<Model[]> {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const like = `%${q}%`;
+  const take = Math.min(50, Math.max(1, limit));
+  const ds = await initializeDataSource();
+
+  // Parametrizado ($1/$2): el término nunca se interpola en el SQL.
+  const rows = (await ds.query(
+    `SELECT DISTINCT m.* FROM models m
+       LEFT JOIN model_checklists mc ON mc.model_id = m.id
+       LEFT JOIN checklists c ON c.id = mc.checklist_id
+     WHERE m.status = 'ACTIVE'
+       AND (
+         LOWER(m.name) LIKE $1
+         OR LOWER(m.username) LIKE $1
+         OR LOWER(COALESCE(m.city, '')) LIKE $1
+         OR LOWER(COALESCE(c.name, '')) LIKE $1
+         OR EXISTS (
+           SELECT 1 FROM unnest(COALESCE(m.services, '{}')) AS svc
+           WHERE LOWER(svc) LIKE $1
+         )
+       )
+     ORDER BY m.name ASC
+     LIMIT $2`,
+    [like, take],
+  )) as Model[];
+
+  return rows;
 }
 
 export async function getModeloBySlug(slug: string): Promise<Model | null> {
@@ -357,13 +418,24 @@ export async function updateModelProfile(
   return getModeloById(modelId);
 }
 
+/** Fotos de perfil (3:4) de la modelo, ordenadas. Excluye el banner (16:9). */
 export async function getModelPhotos(modelId: string): Promise<ModelPhoto[]> {
   const repo = await getRepo(ModelPhotoEntity);
   const rows = await repo.find({
-    where: { model_id: modelId },
+    where: { model_id: modelId, type: "photo" },
     order: { order_index: "ASC" },
   });
   return rows as unknown as ModelPhoto[];
+}
+
+/** Banner 16:9 de la modelo (el más reciente) o `null` si no tiene. */
+export async function getModelBanner(modelId: string): Promise<ModelPhoto | null> {
+  const repo = await getRepo(ModelPhotoEntity);
+  const row = await repo.findOne({
+    where: { model_id: modelId, type: "banner" },
+    order: { created_at: "DESC" },
+  });
+  return (row as unknown as ModelPhoto) ?? null;
 }
 
 export type ModelDashboardSummary = { name: string; onboardingPercentage: number };

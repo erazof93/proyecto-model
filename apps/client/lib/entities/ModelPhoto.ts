@@ -11,7 +11,10 @@ import {
 } from "typeorm";
 import { Model } from "./Model";
 
-/** Espeja `model_photos` (001 + 004_model_photos_updated_at.sql). */
+/** `photo` = foto de perfil 3:4 (600×800). `banner` = banner 16:9 (1200×675). */
+export type PhotoType = "photo" | "banner";
+
+/** Espeja `model_photos` (001 + 004_model_photos_updated_at.sql + 1788760000000-AddModelPhotoType). */
 @Entity("model_photos")
 export class ModelPhoto {
   @PrimaryGeneratedColumn("uuid")
@@ -26,6 +29,9 @@ export class ModelPhoto {
 
   @Column({ type: "varchar", length: 500 })
   cloudinary_url!: string;
+
+  @Column({ type: "varchar", length: 20, default: "photo" })
+  type!: PhotoType;
 
   @Column({ type: "boolean", default: false })
   is_verified!: boolean;

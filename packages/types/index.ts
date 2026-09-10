@@ -100,11 +100,15 @@ export type FeaturedListing = {
   created_at: string;
 };
 
+export type PhotoType = "photo" | "banner";
+
 export type ModelPhoto = {
   id: string;
   model_id: string;
   cloudinary_url: string;
   cloudinary_id: string;
+  /** `photo` = perfil 3:4 (600×800). `banner` = carrusel 16:9 (1200×675). */
+  type: PhotoType;
   is_primary: boolean;
   is_verified: boolean;
   order_index: number;

@@ -21,22 +21,33 @@ describe("FilterSidebar", () => {
     expect(screen.getByLabelText("Modelaje eventos")).toBeInTheDocument();
   });
 
-  it("traduce los códigos de género y los ofrece como opciones de la BD", () => {
-    render(<FilterSidebar options={options} />);
-    expect(screen.getByLabelText("Mujer")).toHaveAttribute("value", "WOMAN");
-    expect(screen.getByLabelText("Hombre")).toHaveAttribute("value", "MAN");
+  it("no renderiza el grupo de género (se controla desde el Header)", () => {
+    const { container } = render(<FilterSidebar options={options} />);
+    expect(screen.queryByLabelText("Mujer")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Hombre")).not.toBeInTheDocument();
+    expect(container.querySelectorAll('input[name="gender"]:not([type="hidden"])')).toHaveLength(0);
   });
 
-  it("ofrece 'Todos' con valor vacío en género y servicio", () => {
+  it("arrastra el género activo como campo oculto para no perderlo al aplicar", () => {
+    const { container } = render(<FilterSidebar current={{ gender: "MAN" }} options={options} />);
+    const hidden = container.querySelector('input[name="gender"]') as HTMLInputElement;
+    expect(hidden.type).toBe("hidden");
+    expect(hidden.value).toBe("MAN");
+  });
+
+  it("el campo oculto de género queda vacío cuando no hay género activo", () => {
+    const { container } = render(<FilterSidebar current={{}} options={options} />);
+    expect((container.querySelector('input[name="gender"]') as HTMLInputElement).value).toBe("");
+  });
+
+  it("ofrece 'Todos' con valor vacío en servicio", () => {
     render(<FilterSidebar options={options} />);
     expect(todoFor("service")?.value).toBe("");
-    expect(todoFor("gender")?.value).toBe("");
   });
 
   it("marca 'Todos' por defecto cuando no hay filtro activo", () => {
     render(<FilterSidebar current={{}} options={options} />);
     expect(todoFor("service")).toBeChecked();
-    expect(todoFor("gender")).toBeChecked();
   });
 
   it("marca el servicio activo y desmarca su 'Todos' cuando hay filtro", () => {

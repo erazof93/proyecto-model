@@ -74,10 +74,21 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
 
   return (
     <>
-      <SearchFilters options={filterOptions} />
-      <section className="mx-auto max-w-6xl px-6 py-8">
-        <FeaturedCarousel models={banner} />
-      </section>
+      <SearchFilters options={filterOptions} currentGender={params.gender ?? "WOMAN"} />
+      {banner.length > 0 && (
+        <section className="mx-auto max-w-6xl px-6 py-8">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-dark">Banners</h2>
+            <Link
+              href="/modelos?type=BANNER"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Ver todos los banners &rarr;
+            </Link>
+          </div>
+          <FeaturedCarousel models={banner} />
+        </section>
+      )}
 
       {vips.length > 0 && (
         <section className="mx-auto max-w-6xl px-6 pb-8">

@@ -43,4 +43,28 @@ describe("ModelGrid", () => {
     );
     expect(container.firstChild).toHaveClass("xl:grid-cols-6", "grid-cols-2");
   });
+
+  it("propaga cardVariant a las cards (wide → 16:9)", () => {
+    const { container } = render(
+      <ModelGrid models={[mk("a", "a-lima")]} cardVariant="wide" />,
+    );
+    expect(container.querySelector("[class*='aspect-video']")).toBeInTheDocument();
+  });
+
+  it("propaga cardImageAspectRatio a las cards", () => {
+    const { container } = render(
+      <ModelGrid
+        models={[mk("a", "a-lima")]}
+        cardImageAspectRatio="h-56 md:aspect-square"
+      />,
+    );
+    expect(container.querySelector(".h-56")).toBeInTheDocument();
+    expect(container.querySelector("[class*='aspect-\\[3\\/4\\]']")).not.toBeInTheDocument();
+  });
+
+  it("sin cardImageAspectRatio las cards usan la proporción 3:4 por defecto (igual HOME)", () => {
+    const { container } = render(<ModelGrid models={[mk("a", "a-lima")]} />);
+    expect(container.querySelector("[class*='aspect-\\[3\\/4\\]']")).toBeInTheDocument();
+    expect(container.querySelector(".h-56")).not.toBeInTheDocument();
+  });
 });

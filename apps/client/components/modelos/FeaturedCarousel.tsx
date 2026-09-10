@@ -15,7 +15,7 @@ export function FeaturedCarousel({ models }: { models: Model[] }) {
   const next = () => setIndex((i) => (i + 1) % models.length);
 
   return (
-    <div className="relative h-[420px] overflow-hidden rounded-md bg-gradient-to-br from-dark/50 to-primary via-40% via-accent">
+    <div className="relative aspect-video w-full overflow-hidden rounded-md bg-gradient-to-br from-dark/50 to-primary via-40% via-accent">
       <div className="absolute inset-0 flex items-center justify-center text-white/60">
         Modelo destacada
       </div>

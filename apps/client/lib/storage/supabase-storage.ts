@@ -102,6 +102,34 @@ export async function uploadPhoto(file: File, modelId: string): Promise<Uploaded
 }
 
 /**
+ * Sube un Buffer ya procesado (p.ej. el JPEG que devuelve `processImage`).
+ * Igual que `uploadPhoto` pero sin validar MIME/tamaño del origen: el buffer
+ * ya viene normalizado por sharp.
+ *
+ * @param buffer  Contenido del archivo.
+ * @param modelId ID del modelo (prefijo de carpeta).
+ * @param ext     Extensión sin punto (p.ej. "jpg").
+ * @param contentType MIME a guardar (p.ej. "image/jpeg").
+ */
+export async function uploadImageBuffer(
+  buffer: Buffer,
+  modelId: string,
+  ext = "jpg",
+  contentType = "image/jpeg",
+): Promise<UploadedPhoto> {
+  const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  const path = `${modelId}/${unique}.${ext}`;
+
+  const { data, error } = await getSupabaseServer()
+    .storage.from(BUCKET_NAME)
+    .upload(path, buffer, { cacheControl: "3600", contentType, upsert: false });
+
+  if (error) throw new Error(error.message || "No se pudo subir la imagen");
+
+  return { path: data.path, url: getPublicUrl(data.path) };
+}
+
+/**
  * Borra un archivo de Supabase Storage. Acepta el path dentro del bucket
  * (recomendado) o una URL pública completa.
  */

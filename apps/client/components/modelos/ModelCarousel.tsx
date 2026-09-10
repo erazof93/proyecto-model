@@ -96,7 +96,7 @@ export function ModelCarousel({
         )}
       >
         {models.map((m) => (
-          <div key={m.id} className="w-[78%] flex-shrink-0 snap-start sm:w-1/2 lg:w-1/4">
+          <div key={m.id} className="w-[47%] flex-shrink-0 snap-start sm:w-1/2 lg:w-1/4">
             <ModelCard model={m} featured={featured.has(m.id)} />
           </div>
         ))}

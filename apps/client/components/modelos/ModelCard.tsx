@@ -4,11 +4,34 @@ import type { Model } from "@proyecto-model/types";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/cn";
 
-export function ModelCard({ model, featured = false }: { model: Model; featured?: boolean }) {
+/**
+ * `portrait` (default): 3:4 vertical — consistente en HOME y /modelos, mobile y
+ * desktop, igual que la foto final (600×800).
+ * `wide`: 16:9 — para el listado de banners (/modelos?type=BANNER).
+ *
+ * `imageAspectRatio` permite sobreescribir la proporción del media en `portrait`.
+ */
+export function ModelCard({
+  model,
+  featured = false,
+  variant = "portrait",
+  imageAspectRatio = "aspect-[3/4]",
+}: {
+  model: Model;
+  featured?: boolean;
+  variant?: "portrait" | "wide";
+  imageAspectRatio?: string;
+}) {
   return (
     <Card className="flex flex-col overflow-hidden" data-testid={`model-card-${model.slug}`}>
-      <div className="relative flex h-56 items-end bg-gradient-to-br from-dark/40 to-primary p-3">
+      <div
+        className={cn(
+          "relative flex w-full items-end bg-gradient-to-br from-dark/40 to-primary p-3",
+          variant === "wide" ? "aspect-video" : imageAspectRatio,
+        )}
+      >
         {featured && (
           <span
             className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-gradient-to-br from-primary to-accent px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-md ring-1 ring-white/25"
