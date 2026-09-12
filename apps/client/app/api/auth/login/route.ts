@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isModelRole } from "@proyecto-model/types";
 import { getUserByUsername, getModelIdentityByUserId } from "@/lib/db/users";
 import { logAuthEvent } from "@/lib/db/auth-logs";
 import { verifyPassword } from "@/lib/auth/password";
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
 
   await logAuthEvent(user.id, "LOGIN", request);
 
-  const model = user.role === "model" ? await getModelIdentityByUserId(user.id) : null;
+  const model = isModelRole(user.role) ? await getModelIdentityByUserId(user.id) : null;
 
   const token = await signSession({
     sub: user.id,

@@ -9,7 +9,7 @@ import type { PhotoType } from "@proyecto-model/types";
 /** Aspect ratio (ancho / alto) objetivo por tipo de foto. */
 export const TARGET_ASPECT: Record<PhotoType, number> = {
   photo: 3 / 4, // 0.75 vertical
-  banner: 16 / 9, // ≈ 1.78 horizontal
+  banner: 16 / 9, // ≈1.78 horizontal
 };
 
 /** Medida final exacta (px) a la que se redimensiona cada tipo. */

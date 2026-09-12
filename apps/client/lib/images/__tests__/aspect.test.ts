@@ -36,8 +36,13 @@ describe("images/aspect", () => {
       expect(needsManualCrop(800, 1200, "banner")).toBe(true);
     });
 
-    it("no pide recorte para un banner 16:9", () => {
+    it("pide recorte para un banner 3:2 (ya no es la proporción objetivo)", () => {
+      expect(needsManualCrop(1500, 1000, "banner")).toBe(true);
+    });
+
+    it("no pide recorte para un banner exactamente 16:9", () => {
       expect(needsManualCrop(1920, 1080, "banner")).toBe(false);
+      expect(needsManualCrop(1280, 720, "banner")).toBe(false);
     });
 
     it("devuelve false si falta una dimensión", () => {

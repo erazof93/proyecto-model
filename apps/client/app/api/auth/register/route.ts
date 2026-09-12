@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Role } from "@proyecto-model/types";
+import { Role, SELF_SERVICE_ROLES } from "@proyecto-model/types";
 import { createUser, usernameExists } from "@/lib/db/users";
 import { logAuthEvent } from "@/lib/db/auth-logs";
 import { hashPassword } from "@/lib/auth/password";
@@ -22,8 +22,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ese usuario ya existe" }, { status: 409 });
   }
 
+  // Allowlist explícito (customer/model/both): un rol fuera de esta lista —
+  // "admin" incluido — nunca se confía, cae a customer. Ver el test
+  // "ignora cualquier rol fuera del allowlist" en __tests__/route.test.ts.
+  const role = (SELF_SERVICE_ROLES as readonly string[]).includes(parsed.data.role ?? "")
+    ? (parsed.data.role as Role)
+    : Role.CUSTOMER;
+
   const passwordHash = await hashPassword(password);
-  const user = await createUser(username, passwordHash, Role.CUSTOMER);
+  const user = await createUser(username, passwordHash, role);
   await logAuthEvent(user.id, "REGISTER", request);
 
   const token = await signSession({ sub: user.id, username: user.username, role: user.role });

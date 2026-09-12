@@ -15,6 +15,11 @@ export const registerSchema = z
       .regex(USERNAME_RE, "Usuario inválido (3-30 caracteres, sin espacios)"),
     password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
     confirmPassword: z.string(),
+    // String suelto a propósito: el route handler valida contra un allowlist
+    // (customer/model/both, nunca admin) y cualquier otra cosa cae a
+    // "customer" en silencio, en vez de rechazar el registro entero por un
+    // campo que el cliente no debería poder usar para escalar privilegios.
+    role: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Las contraseñas no coinciden",

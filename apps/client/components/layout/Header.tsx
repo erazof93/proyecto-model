@@ -77,8 +77,11 @@ export function Header() {
           <Link href="/modelos" className="hover:text-primary">
             Modelos
           </Link>
-          <Link href="/modelo/dashboard" className="hover:text-primary">
-            Soy modelo
+          <Link
+            href="/modelo/dashboard/perfil"
+            className="rounded-lg bg-gradient-to-r from-primary to-accent px-4 py-2 font-bold text-white transition-all duration-200 hover:scale-105 hover:shadow-lg"
+          >
+            📢 Publica tu anuncio
           </Link>
         </nav>
 

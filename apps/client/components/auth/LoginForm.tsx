@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Button } from "@/components/ui/Button";
+import { RoleSelectionModal } from "@/components/auth/RoleSelectionModal";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/cn";
 
@@ -20,6 +21,8 @@ export function LoginForm() {
   const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regPassword2, setRegPassword2] = useState("");
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [createdUserId, setCreatedUserId] = useState<string | null>(null);
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
@@ -45,8 +48,8 @@ export function LoginForm() {
       setError(result.error);
       return;
     }
-    router.push("/");
-    router.refresh();
+    setCreatedUserId(result.userId);
+    setShowRoleModal(true);
   }
 
   return (
@@ -162,6 +165,18 @@ export function LoginForm() {
             Crear cuenta
           </Button>
         </form>
+      )}
+
+      {createdUserId && (
+        <RoleSelectionModal
+          isOpen={showRoleModal}
+          userId={createdUserId}
+          onClose={() => {
+            setShowRoleModal(false);
+            router.push("/");
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );

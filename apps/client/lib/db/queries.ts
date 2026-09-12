@@ -1,4 +1,5 @@
 import type {
+  BannerRequest,
   Checklist,
   Model,
   ModelPhoto,
@@ -6,6 +7,7 @@ import type {
   ReviewStats,
   ReviewWithCustomer,
 } from "@proyecto-model/types";
+import { BannerRequest as BannerRequestEntity } from "../entities/BannerRequest";
 import { Checklist as ChecklistEntity } from "../entities/Checklist";
 import { FeaturedListing as FeaturedListingEntity } from "../entities/FeaturedListing";
 import { Model as ModelEntity } from "../entities/Model";
@@ -392,6 +394,7 @@ export type ModelProfileUpdate = Partial<
     | "age"
     | "gender"
     | "bio"
+    | "city"
     | "height"
     | "weight"
     | "clothing_size"
@@ -438,6 +441,24 @@ export async function getModelBanner(modelId: string): Promise<ModelPhoto | null
   return (row as unknown as ModelPhoto) ?? null;
 }
 
+/** Crea una solicitud de banner (bandeja de entrada, sin foto todavía). */
+export async function createBannerRequest(
+  modelId: string,
+  title: string,
+  description: string | null,
+): Promise<BannerRequest> {
+  const repo = await getRepo(BannerRequestEntity);
+  const saved = await repo.save(repo.create({ model_id: modelId, title, description }));
+  return saved as unknown as BannerRequest;
+}
+
+/** Solicitudes de banner de una modelo, más recientes primero. */
+export async function getBannerRequestsByModel(modelId: string): Promise<BannerRequest[]> {
+  const repo = await getRepo(BannerRequestEntity);
+  const rows = await repo.find({ where: { model_id: modelId }, order: { created_at: "DESC" } });
+  return rows as unknown as BannerRequest[];
+}
+
 export type ModelDashboardSummary = { name: string; onboardingPercentage: number };
 
 /** Datos mínimos para el header de /modelo/dashboard (no forman parte del tipo Model compartido). */
@@ -455,7 +476,11 @@ export async function getModelDashboardSummary(
 export async function getModeloById(modelId: string): Promise<Model | null> {
   const repo = await getRepo(ModelEntity);
   const row = await repo.findOne({ where: { id: modelId } });
-  return (row as unknown as Model) ?? null;
+  // Spread a un objeto plano: `row` es una instancia de la clase `ModelEntity`
+  // (prototipo no plano) y ProfileForm es un Client Component — pasarle la
+  // instancia tal cual revienta la serialización RSC ("Classes ... are not
+  // supported").
+  return row ? ({ ...row } as unknown as Model) : null;
 }
 
 /** Reviews de una modelo con el username de la clienta ya resuelto. */

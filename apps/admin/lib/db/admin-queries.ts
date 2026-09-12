@@ -1,4 +1,4 @@
-import type { Checklist, FeaturedType, Model, ModelPhoto } from "@proyecto-model/types";
+import type { BannerRequestStatus, Checklist, FeaturedType, Model, ModelPhoto } from "@proyecto-model/types";
 import pool from "./connection";
 
 const MODEL_COLUMNS = `
@@ -207,6 +207,122 @@ export async function cancelFeaturedListing(listingId: string) {
     }
   }
   return listing;
+}
+
+export type AdminBannerRequest = {
+  id: string;
+  model_id: string;
+  title: string;
+  description: string | null;
+  status: BannerRequestStatus;
+  admin_notes: string | null;
+  reviewed_at: string | null;
+  featured_listing_id: string | null;
+  created_at: string;
+  model_name: string;
+  model_slug: string;
+  model_username: string;
+};
+
+const BANNER_REQUEST_COLUMNS = `
+  br.id, br.model_id, br.title, br.description, br.status, br.admin_notes,
+  br.reviewed_at, br.featured_listing_id, br.created_at,
+  m.name AS model_name, m.slug AS model_slug, m.username AS model_username
+`;
+
+export async function getBannerRequests(filters?: {
+  status?: string;
+}): Promise<AdminBannerRequest[]> {
+  let query = `
+    SELECT ${BANNER_REQUEST_COLUMNS}
+    FROM banner_requests br
+    LEFT JOIN models m ON m.id = br.model_id`;
+  const params: unknown[] = [];
+
+  if (filters?.status) {
+    params.push(filters.status);
+    query += ` WHERE br.status = $${params.length}`;
+  }
+
+  query += " ORDER BY br.created_at DESC";
+
+  const result = await pool.query<AdminBannerRequest>(query, params);
+  return result.rows;
+}
+
+/**
+ * Precio/duración del slot BANNER al aprobar una solicitud — mismo plan fijo
+ * que ofrece CreateFeaturedDialog ("BANNER Carrusel (home)", S/75 x 7 días).
+ * Si cambia el pricing ahí, cambiarlo también aquí.
+ */
+const BANNER_PLAN = { price: 75, durationDays: 7 } as const;
+
+/**
+ * Aprueba la solicitud. Si `createFeaturedListing` es true (default), además
+ * crea el slot pago en `featured_listings` (type=BANNER) y lo enlaza. La foto
+ * en sí la sube la modelo después, por el flujo normal de upload.
+ */
+export async function approveBannerRequest(
+  requestId: string,
+  adminId: string,
+  notes?: string,
+  createListing = true,
+): Promise<AdminBannerRequest | null> {
+  const existing = await pool.query<{ model_id: string }>(
+    "SELECT model_id FROM banner_requests WHERE id = $1 AND status = 'PENDING'",
+    [requestId],
+  );
+  const row = existing.rows[0];
+  if (!row) return null;
+
+  let featuredListingId: string | null = null;
+  if (createListing) {
+    const listing = await createFeaturedListing(
+      row.model_id,
+      "BANNER",
+      BANNER_PLAN.price,
+      BANNER_PLAN.durationDays,
+      adminId,
+    );
+    featuredListingId = listing.id;
+  }
+
+  await pool.query(
+    `UPDATE banner_requests
+     SET status = 'APPROVED', admin_notes = $1, reviewed_by_admin_id = $2,
+         reviewed_at = NOW(), featured_listing_id = $3, updated_at = NOW()
+     WHERE id = $4`,
+    [notes ?? null, adminId, featuredListingId, requestId],
+  );
+
+  const result = await pool.query<AdminBannerRequest>(
+    `SELECT ${BANNER_REQUEST_COLUMNS} FROM banner_requests br
+     LEFT JOIN models m ON m.id = br.model_id WHERE br.id = $1`,
+    [requestId],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function rejectBannerRequest(
+  requestId: string,
+  adminId: string,
+  notes?: string,
+): Promise<AdminBannerRequest | null> {
+  const updated = await pool.query(
+    `UPDATE banner_requests
+     SET status = 'REJECTED', admin_notes = $1, reviewed_by_admin_id = $2,
+         reviewed_at = NOW(), updated_at = NOW()
+     WHERE id = $3 AND status = 'PENDING'`,
+    [notes ?? null, adminId, requestId],
+  );
+  if (updated.rowCount === 0) return null;
+
+  const result = await pool.query<AdminBannerRequest>(
+    `SELECT ${BANNER_REQUEST_COLUMNS} FROM banner_requests br
+     LEFT JOIN models m ON m.id = br.model_id WHERE br.id = $1`,
+    [requestId],
+  );
+  return result.rows[0] ?? null;
 }
 
 export type AdminStats = {

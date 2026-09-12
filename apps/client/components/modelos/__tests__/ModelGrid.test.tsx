@@ -48,7 +48,7 @@ describe("ModelGrid", () => {
     const { container } = render(
       <ModelGrid models={[mk("a", "a-lima")]} cardVariant="wide" />,
     );
-    expect(container.querySelector("[class*='aspect-video']")).toBeInTheDocument();
+    expect(container.querySelector(".aspect-video")).toBeInTheDocument();
   });
 
   it("propaga cardImageAspectRatio a las cards", () => {

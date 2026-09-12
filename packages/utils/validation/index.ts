@@ -14,6 +14,7 @@ export const profileSchema = z.object({
     .max(99),
   gender: z.nativeEnum(Gender),
   bio: z.string().max(500, "Bio máximo 500 caracteres").optional(),
+  city: z.string().max(100).optional(),
   height: z.number().min(120).max(230).optional(),
   weight: z.number().min(35).max(200).optional(),
   clothing_size: z.string().max(10).optional(),

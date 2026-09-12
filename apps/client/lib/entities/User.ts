@@ -31,11 +31,11 @@ export class User {
 
   @Column({
     type: "enum",
-    enum: ["admin", "model", "customer"],
+    enum: ["admin", "model", "customer", "both"],
     enumName: "role_enum",
     default: "customer",
   })
-  role!: "admin" | "model" | "customer";
+  role!: "admin" | "model" | "customer" | "both";
 
   @Column({ type: "boolean", default: true })
   is_active!: boolean;

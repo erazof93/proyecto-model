@@ -1,15 +1,22 @@
 "use client";
 
 import { createContext, useCallback, useEffect, useState, type ReactNode } from "react";
+import { Role } from "@proyecto-model/types";
 import type { SessionUser } from "@/lib/auth/types";
 
 type ActionResult = { success: true } | { success: false; error: string };
+type RegisterResult = { success: true; userId: string } | { success: false; error: string };
 
 type AuthContextValue = {
   user: SessionUser | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<ActionResult>;
-  register: (username: string, password: string, confirmPassword: string) => Promise<ActionResult>;
+  register: (
+    username: string,
+    password: string,
+    confirmPassword: string,
+    role?: Role,
+  ) => Promise<RegisterResult>;
   logout: () => Promise<void>;
 };
 
@@ -49,15 +56,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (username: string, password: string, confirmPassword: string): Promise<ActionResult> => {
+    async (
+      username: string,
+      password: string,
+      confirmPassword: string,
+      role?: Role,
+    ): Promise<RegisterResult> => {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password, confirmPassword }),
+        body: JSON.stringify({ username, password, confirmPassword, role }),
       });
       if (!res.ok) return { success: false, error: await parseError(res) };
+      const data = await res.json();
       await refresh();
-      return { success: true };
+      return { success: true, userId: data.user.id };
     },
     [refresh],
   );

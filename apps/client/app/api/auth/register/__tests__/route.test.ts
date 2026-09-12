@@ -60,7 +60,43 @@ describe("POST /api/auth/register", () => {
     expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
-  it("always creates the new user as role customer, ignoring any client-supplied role", async () => {
+  it("defaults to role customer when none is supplied", async () => {
+    mockUsernameExists.mockResolvedValue(false);
+    mockCreateUser.mockResolvedValue({ id: "new-1", username: "new_user", role: "customer" });
+
+    const response = await POST(
+      makeRequest({ username: "new_user", password: "password123", confirmPassword: "password123" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreateUser).toHaveBeenCalledWith("new_user", expect.any(String), "customer");
+
+    const data = await response.json();
+    expect(data.user.role).toBe("customer");
+    expect(data.token).toBeUndefined();
+
+    const cookie = response.cookies.get(SESSION_COOKIE);
+    expect(cookie?.value).toBeDefined();
+  });
+
+  it.each(["model", "both"])("honors a self-selected role=%s (allowlisted)", async (role) => {
+    mockUsernameExists.mockResolvedValue(false);
+    mockCreateUser.mockResolvedValue({ id: "new-1", username: "new_user", role });
+
+    const response = await POST(
+      makeRequest({
+        username: "new_user",
+        password: "password123",
+        confirmPassword: "password123",
+        role,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCreateUser).toHaveBeenCalledWith("new_user", expect.any(String), role);
+  });
+
+  it("ignores any role outside the allowlist — never lets a client self-assign admin", async () => {
     mockUsernameExists.mockResolvedValue(false);
     mockCreateUser.mockResolvedValue({ id: "new-1", username: "new_user", role: "customer" });
 
@@ -78,9 +114,5 @@ describe("POST /api/auth/register", () => {
 
     const data = await response.json();
     expect(data.user.role).toBe("customer");
-    expect(data.token).toBeUndefined();
-
-    const cookie = response.cookies.get(SESSION_COOKIE);
-    expect(cookie?.value).toBeDefined();
   });
 });

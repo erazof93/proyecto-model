@@ -1,4 +1,5 @@
 export { AuthLog } from "./AuthLog";
+export { BannerRequest } from "./BannerRequest";
 export { Checklist } from "./Checklist";
 export { FeaturedListing } from "./FeaturedListing";
 export { Model } from "./Model";

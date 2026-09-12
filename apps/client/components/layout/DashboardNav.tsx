@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileEdit, Image, Sparkles, Star, MessageCircle } from "lucide-react";
+import { FileEdit, Image, Sparkles, Star, MessageCircle, GalleryHorizontal } from "lucide-react";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { cn } from "@/lib/cn";
 
 const links = [
   { href: "/modelo/dashboard/perfil", label: "Mi perfil", icon: FileEdit },
   { href: "/modelo/dashboard/fotos", label: "Mis fotos", icon: Image },
+  { href: "/modelo/dashboard/banner", label: "Mi banner", icon: GalleryHorizontal },
   { href: "/modelo/dashboard/servicios", label: "Mis servicios", icon: Sparkles },
   { href: "/modelo/dashboard/reviews", label: "Reseñas", icon: Star },
   { href: "/modelo/dashboard/contacto", label: "Contactar admin", icon: MessageCircle },

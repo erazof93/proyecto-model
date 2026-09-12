@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isModelRole } from "@proyecto-model/types";
 import { verifySession } from "@/lib/auth/jwt";
 import { SESSION_COOKIE } from "@/lib/auth/session";
 
@@ -9,7 +10,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/modelo/")) {
-    if (!session || session.role !== "model") {
+    if (!session || !isModelRole(session.role)) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }

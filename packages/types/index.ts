@@ -14,6 +14,16 @@ export enum Role {
   ADMIN = "admin",
   MODEL = "model",
   CUSTOMER = "customer",
+  /** Cliente que también tiene (o tendrá) un perfil de modelo. */
+  BOTH = "both",
+}
+
+/** Roles que un usuario puede elegir al registrarse (nunca `admin`, ver /api/auth/register). */
+export const SELF_SERVICE_ROLES = [Role.CUSTOMER, Role.MODEL, Role.BOTH] as const;
+
+/** ¿Este rol tiene (o puede tener) un perfil de modelo asociado? */
+export function isModelRole(role: Role | string): boolean {
+  return role === Role.MODEL || role === Role.BOTH;
 }
 
 export enum ModelStatus {
@@ -139,6 +149,29 @@ export type Checklist = {
   description?: string;
   is_active: boolean;
   created_at: string;
+};
+
+export type BannerRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/**
+ * Solicitud de banner de una modelo (rol MODEL/BOTH). Es solo la bandeja de
+ * entrada: al aprobar, la modelo sube la foto por el flujo normal
+ * (`/api/modelos/fotos/upload`, type=banner) y opcionalmente el admin crea un
+ * `FeaturedListing` (type=BANNER) para el slot pago — `featured_listing_id`
+ * queda enlazado si eso ocurrió.
+ */
+export type BannerRequest = {
+  id: string;
+  model_id: string;
+  title: string;
+  description?: string | null;
+  status: BannerRequestStatus;
+  admin_notes?: string | null;
+  reviewed_by_admin_id?: string | null;
+  reviewed_at?: string | null;
+  featured_listing_id?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Transaction = {

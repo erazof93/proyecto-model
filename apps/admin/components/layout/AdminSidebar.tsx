@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, Star, BarChart3, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Star, BarChart3, LogOut, GalleryHorizontal } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/components/providers/AuthProvider";
 
@@ -10,6 +10,7 @@ const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/modelos", label: "Modelos", icon: Users },
   { href: "/dashboard/featured", label: "Featured", icon: Star },
+  { href: "/dashboard/banner-requests", label: "Banners", icon: GalleryHorizontal },
   { href: "/dashboard/reportes", label: "Reportes", icon: BarChart3 },
 ];
 

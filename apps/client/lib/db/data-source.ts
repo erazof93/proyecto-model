@@ -8,6 +8,7 @@ import { DataSource } from "typeorm";
 // (../entities -> ../entities/index). El barrel sigue disponible para el código
 // de la app en lib/entities/index.ts.
 import { AuthLog } from "../entities/AuthLog";
+import { BannerRequest } from "../entities/BannerRequest";
 import { Checklist } from "../entities/Checklist";
 import { FeaturedListing } from "../entities/FeaturedListing";
 import { Model } from "../entities/Model";
@@ -100,6 +101,7 @@ const ENTITIES = [
   ModelInteraction,
   Transaction,
   AuthLog,
+  BannerRequest,
 ];
 
 function buildDataSource(): DataSource {

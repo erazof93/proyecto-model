@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { isModelRole } from "@proyecto-model/types";
 import { profileSchema } from "@proyecto-model/utils";
 import { getSession } from "@/lib/auth/session";
 import { updateModelProfile } from "@/lib/db/queries";
 
 export async function PUT(request: Request) {
   const session = await getSession();
-  if (!session || session.role !== "model" || !session.modelId) {
+  if (!session || !isModelRole(session.role) || !session.modelId) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
